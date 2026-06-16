@@ -1,0 +1,630 @@
+version: 1
+
+project:
+  name: capital_relevant_watchlist_engine
+  description: >
+    Monitors selected entities across public APIs and normalizes matching records
+    into evidence hits.
+
+settings:
+  max_results_per_query: 25
+  require_entity_match: True
+  min_relevance_score: 4
+  high_relevance_score: 8
+  medium_relevance_score: 4
+
+sources:
+  openalex:
+    enabled: True
+    purpose: research_trend_monitoring
+
+  gdelt:
+    enabled: True
+    purpose: news_and_event_monitoring
+
+  wikidata:
+    enabled: True
+    purpose: entity_resolution_and_alias_expansion
+
+  sec:
+    enabled: False
+    purpose: public_company_filing_monitoring
+
+
+entities:
+  - id: chile
+    name: Chile
+    type: country
+    priority: high
+    manual_aliases:
+      - Chile
+      - Republic of Chile
+      - Chilean
+      - CHL
+    related_entities:
+      - copper
+      - lithium
+      - mining
+      - codelco
+    priority_concepts:
+      - mining_disruption
+      - copper_supply
+      - lithium_supply
+      - political_risk
+      - environmental_pressure
+    negative_terms: []
+
+  - id: codelco
+    name: Codelco
+    type: company
+    priority: high
+    manual_aliases:
+      - Codelco
+      - CODELCO
+      - Corporación Nacional del Cobre
+      - National Copper Corporation of Chile
+    related_entities:
+      - chile
+      - copper
+      - mining
+    priority_concepts:
+      - labor_disruption
+      - mining_disruption
+      - copper_supply
+      - production_risk
+      - environmental_pressure
+    negative_terms: []
+
+  - id: copper
+    name: copper
+    type: commodity
+    priority: high
+    manual_aliases:
+      - copper
+      - copper mining
+      - copper supply
+      - copper concentrate
+      - copper production
+      - copper exports
+    related_entities:
+      - chile
+      - codelco
+      - freeport_mcmoran
+      - mining
+    priority_concepts:
+      - copper_supply
+      - mining_disruption
+      - production_risk
+      - export_disruption
+      - inventory_pressure
+    negative_terms:
+      - copper color
+      - copper cookware
+      - copper jewelry
+
+  - id: lithium
+    name: lithium
+    type: commodity
+    priority: medium
+    manual_aliases:
+      - lithium
+      - lithium mining
+      - lithium extraction
+      - lithium carbonate
+      - lithium hydroxide
+      - lithium supply
+    related_entities:
+      - chile
+      - batteries
+      - electric vehicles
+    priority_concepts:
+      - lithium_supply
+      - mining_disruption
+      - environmental_pressure
+      - battery_supply_chain
+    negative_terms:
+      - lithium medication
+      - bipolar disorder
+
+  - id: grid_storage
+    name: grid storage
+    type: theme
+    priority: medium
+    manual_aliases:
+      - grid storage
+      - battery storage
+      - energy storage
+      - utility-scale storage
+      - grid-scale batteries
+      - long-duration energy storage
+    related_entities:
+      - batteries
+      - lithium
+      - copper
+      - electricity_grid
+    priority_concepts:
+      - research_momentum
+      - infrastructure_growth
+      - battery_supply_chain
+      - energy_transition
+    negative_terms: []
+
+  - id: solid_state_batteries
+    name: solid-state batteries
+    type: technology
+    priority: medium
+    manual_aliases:
+      - solid-state battery
+      - solid state battery
+      - solid-state batteries
+      - solid state batteries
+      - solid electrolyte battery
+    related_entities:
+      - batteries
+      - lithium
+      - grid_storage
+      - electric vehicles
+    priority_concepts:
+      - research_momentum
+      - battery_supply_chain
+      - commercialization
+      - manufacturing_scaleup
+    negative_terms: []
+
+  - id: freeport_mcmoran
+    name: Freeport-McMoRan
+    type: public_company
+    priority: medium
+    manual_aliases:
+      - Freeport-McMoRan
+      - Freeport McMoRan
+      - Freeport-McMoRan Inc
+      - FCX
+    identifiers:
+      ticker: FCX
+      sec_cik: null
+      wikidata_id: null
+    related_entities:
+      - copper
+      - mining
+      - molybdenum
+    priority_concepts:
+      - copper_supply
+      - mining_disruption
+      - production_risk
+      - regulatory_pressure
+      - environmental_pressure
+    negative_terms: []
+
+
+concepts:
+  labor_disruption:
+    id: labor_disruption
+    description: Workers, unions, strikes, wage disputes, or labor actions affecting operations.
+    score: 3
+    terms:
+      - strike
+      - strikes
+      - walkout
+      - walk off
+      - walked off
+      - workers walked off
+      - work stoppage
+      - labor unrest
+      - labour unrest
+      - industrial action
+      - union dispute
+      - wage dispute
+      - failed wage talks
+      - wage negotiations
+      - collective bargaining
+      - workers protest
+      - miners protest
+      - unionized workers
+      - labor conflict
+      - labour conflict
+
+  mining_disruption:
+    id: mining_disruption
+    description: Mining operations disrupted by shutdowns, accidents, weather, protests, or operational problems.
+    score: 3
+    terms:
+      - mine shutdown
+      - mine closure
+      - mining disruption
+      - operations suspended
+      - operations halted
+      - production halted
+      - output halted
+      - output reduced
+      - production reduced
+      - mine accident
+      - blockade
+      - road blockade
+      - protest at mine
+      - suspended operations
+      - disrupted operations
+      - operational disruption
+      - operational issues
+
+  copper_supply:
+    id: copper_supply
+    description: Evidence related to copper supply, production, demand, exports, shortages, or inventories.
+    score: 2
+    terms:
+      - copper supply
+      - copper production
+      - copper output
+      - copper exports
+      - copper concentrate
+      - copper mine
+      - copper mines
+      - copper demand
+      - copper shortage
+      - copper inventories
+      - refined copper
+      - copper smelter
+      - copper shipment
+      - copper market
+      - copper prices
+
+  lithium_supply:
+    id: lithium_supply
+    description: Evidence related to lithium supply, production, exports, extraction, or shortages.
+    score: 2
+    terms:
+      - lithium supply
+      - lithium production
+      - lithium extraction
+      - lithium exports
+      - lithium carbonate
+      - lithium hydroxide
+      - lithium mine
+      - lithium mines
+      - lithium shortage
+      - lithium demand
+      - lithium brine
+      - lithium project
+
+  production_risk:
+    id: production_risk
+    description: Any language suggesting output, operations, or production capacity may be affected.
+    score: 2
+    terms:
+      - production risk
+      - production delay
+      - production delays
+      - output delay
+      - lower output
+      - reduced output
+      - reduced production
+      - production cut
+      - production cuts
+      - capacity reduction
+      - operations delay
+      - operations delayed
+      - supply constraint
+      - supply constraints
+      - bottleneck
+      - bottlenecks
+
+  export_disruption:
+    id: export_disruption
+    description: Export, port, logistics, or shipment disruptions.
+    score: 2
+    terms:
+      - export delay
+      - export delays
+      - shipment delay
+      - shipment delays
+      - shipping disruption
+      - port disruption
+      - port strike
+      - port congestion
+      - customs delay
+      - logistics disruption
+      - transport disruption
+      - rail disruption
+      - supply route
+      - export restrictions
+
+  inventory_pressure:
+    id: inventory_pressure
+    description: Inventory builds, shortages, drawdowns, or abnormal stockpile movement.
+    score: 2
+    terms:
+      - inventory build
+      - inventory buildup
+      - rising inventories
+      - falling inventories
+      - inventory drawdown
+      - stockpile
+      - stockpiles
+      - warehouse stocks
+      - shortage
+      - shortages
+      - supply glut
+      - oversupply
+      - tight supply
+
+  regulatory_pressure:
+    id: regulatory_pressure
+    description: Government, legal, compliance, investigation, permitting, or regulatory pressure.
+    score: 2
+    terms:
+      - investigation
+      - regulatory probe
+      - regulator
+      - regulators
+      - lawsuit
+      - legal action
+      - fine
+      - penalty
+      - sanctions
+      - compliance violation
+      - permit delay
+      - permit denied
+      - environmental permit
+      - government review
+      - antitrust
+      - enforcement action
+
+  environmental_pressure:
+    id: environmental_pressure
+    description: Environmental, water, pollution, emissions, climate, or community pressure.
+    score: 2
+    terms:
+      - environmental impact
+      - water shortage
+      - water scarcity
+      - drought
+      - pollution
+      - contamination
+      - emissions
+      - tailings
+      - tailings dam
+      - local community
+      - community opposition
+      - environmental protest
+      - environmental review
+      - indigenous community
+      - climate risk
+
+  political_risk:
+    id: political_risk
+    description: Political instability, policy shifts, elections, nationalization, taxes, or state intervention.
+    score: 2
+    terms:
+      - political risk
+      - policy change
+      - mining royalty
+      - royalty increase
+      - tax increase
+      - nationalization
+      - state control
+      - government intervention
+      - election uncertainty
+      - political instability
+      - constitutional reform
+      - resource nationalism
+      - export ban
+      - trade restriction
+
+  research_momentum:
+    id: research_momentum
+    description: Academic or technical research activity around a theme.
+    score: 1
+    terms:
+      - research
+      - study
+      - studies
+      - paper
+      - publication
+      - published
+      - academic
+      - laboratory
+      - prototype
+      - experiment
+      - breakthrough
+      - review article
+      - technical report
+
+  commercialization:
+    id: commercialization
+    description: Movement from research/prototype into commercial deployment.
+    score: 2
+    terms:
+      - commercialization
+      - commercial deployment
+      - pilot project
+      - demonstration project
+      - prototype
+      - manufacturing
+      - production line
+      - factory
+      - scale up
+      - scale-up
+      - mass production
+      - commercial launch
+      - first deployment
+
+  manufacturing_scaleup:
+    id: manufacturing_scaleup
+    description: Factory, production, supply-chain, or capacity expansion around technology manufacturing.
+    score: 2
+    terms:
+      - factory
+      - gigafactory
+      - manufacturing plant
+      - production capacity
+      - capacity expansion
+      - scale up production
+      - supply chain
+      - supplier
+      - suppliers
+      - component shortage
+      - production ramp
+      - ramp-up
+      - manufacturing bottleneck
+
+  battery_supply_chain:
+    id: battery_supply_chain
+    description: Battery material, production, supply, demand, or component-chain evidence.
+    score: 2
+    terms:
+      - battery supply chain
+      - battery materials
+      - cathode
+      - anode
+      - electrolyte
+      - battery cells
+      - cell manufacturing
+      - battery production
+      - battery shortage
+      - battery demand
+      - battery recycling
+      - critical minerals
+      - raw materials
+
+  infrastructure_growth:
+    id: infrastructure_growth
+    description: Grid, power, transmission, utility, or infrastructure expansion.
+    score: 2
+    terms:
+      - grid expansion
+      - transmission line
+      - power grid
+      - electricity grid
+      - infrastructure investment
+      - utility-scale
+      - grid upgrade
+      - grid modernization
+      - energy infrastructure
+      - storage deployment
+      - renewable integration
+
+  energy_transition:
+    id: energy_transition
+    description: Energy transition themes involving electrification, renewables, batteries, or grid demand.
+    score: 1
+    terms:
+      - energy transition
+      - electrification
+      - renewable energy
+      - clean energy
+      - decarbonization
+      - decarbonisation
+      - electric vehicles
+      - EV demand
+      - grid demand
+      - battery demand
+
+
+scoring:
+  entity_match:
+    exact_name: 3
+    manual_alias: 3
+    wikidata_alias: 2
+    related_entity: 1
+
+  concept_match:
+    use_concept_score: True
+
+  source_weight:
+    gdelt: 1
+    openalex: 1
+    wikidata: 0
+    sec: 2
+
+  recency:
+    within_1_days: 4
+    within_3_days: 3
+    within_7_days: 2
+    within_14_days: 1
+    older_than_14_days: 0
+
+  penalties:
+    negative_term_match: -3
+    missing_date: -1
+    missing_url: -1
+    weak_entity_match: -2
+
+  labels:
+    high:
+      min_score: 8
+    medium:
+      min_score: 4
+    low:
+      min_score: 0
+
+
+query_templates:
+  gdelt:
+    country:
+      - "{entity}"
+      - "{entity} mining"
+      - "{entity} copper"
+      - "{entity} lithium"
+      - "{entity} disruption"
+    company:
+      - "{entity}"
+      - "{entity} copper"
+      - "{entity} mining"
+      - "{entity} strike"
+      - "{entity} production"
+    commodity:
+      - "{entity} supply"
+      - "{entity} production"
+      - "{entity} shortage"
+      - "{entity} exports"
+      - "{entity} disruption"
+    theme:
+      - "{entity}"
+      - "{entity} investment"
+      - "{entity} deployment"
+      - "{entity} supply chain"
+    technology:
+      - "{entity}"
+      - "{entity} breakthrough"
+      - "{entity} manufacturing"
+      - "{entity} commercialization"
+    public_company:
+      - "{entity}"
+      - "{entity} copper"
+      - "{entity} production"
+      - "{entity} mine"
+      - "{entity} supply"
+
+  openalex:
+    country:
+      - "{entity} mining"
+      - "{entity} copper"
+      - "{entity} lithium"
+      - "{entity} energy"
+    company:
+      - "{entity}"
+      - "{entity} mining"
+      - "{entity} copper"
+    commodity:
+      - "{entity} supply chain"
+      - "{entity} production"
+      - "{entity} demand"
+      - "{entity} market"
+    theme:
+      - "{entity}"
+      - "{entity} deployment"
+      - "{entity} technology"
+      - "{entity} infrastructure"
+    technology:
+      - "{entity}"
+      - "{entity} materials"
+      - "{entity} manufacturing"
+      - "{entity} performance"
+    public_company:
+      - "{entity}"
+      - "{entity} mining"
+      - "{entity} copper"
+
+  wikidata:
+    all:
+      - "{entity}"
