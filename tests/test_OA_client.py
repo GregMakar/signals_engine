@@ -39,11 +39,13 @@ print(queries)
 all_hits = []
 for query in queries:
     works = oa_client.search_works(query=query) # -> json/dict response for one query
-    normalized_hits = oa_client_normalizer.to_evidence_hits(response=works, entity=entity) # -> turns all json/dicts to evidence hits in a list
+    normalized_hits = oa_client_normalizer.to_evidence_hits(response=works, entity=entity, author_enrich=True) # -> turns all json/dicts to evidence hits in a list
     for hit in normalized_hits:
         hit.matched_concepts = matcher.match_all(text=hit.matching_text) # -> enrich matched_concepts
         scored_hit = scorer.score(hit, entity) # -> enrich scores
         all_hits.append(hit)
+
+print('Storing...')
 
 store = ParquetStore()
 store.save_records(all_hits, 'openalex_first_test')

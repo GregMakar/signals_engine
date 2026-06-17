@@ -30,6 +30,7 @@ class ReportBuilder:
             lines.append(f"- Reason: {row['reason']}")
             lines.append(f"- URL: {row['url']}")
             lines.append(f"- Publication Date: {row['published_at']}")
+            lines.append(f"- Authors: {row['authors']}")
             lines.append("")
 
         path.write_text("\n".join(lines), encoding="utf-8")

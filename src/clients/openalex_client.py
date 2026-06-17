@@ -179,8 +179,8 @@ class OpenAlexClient:
         """
         https://developers.openalex.org/api-reference/authors/get-a-single-author?playground=open
 
-        :param author_id:
-        :return:
+        :param author_id: OpenAlex auther id, it needs to be in A1234 format, without the prefix link.
+        :return:one dictionary containing data on one author
         """
         if author_id is None:
             raise ValueError('author_id NA at OpenAlex DB')
@@ -223,7 +223,10 @@ class OpenAlexNormalizer:
             for author in work['authorships']:
                 _id = author['author'].get('id', None)
                 clean_id = _id.lstrip('https://openalex.org/') if _id is not None else None
-                authors.append(client.search_author(clean_id))
+                if clean_id:
+                    authors.append(client.search_author(clean_id))
+                else:
+                    authors.append({'Unkown_id_author': author['author'].get('display_name', None)})
         else:
             authors = [author['author']['display_name'] for author in work['authorships']]
 
@@ -248,19 +251,24 @@ class OpenAlexNormalizer:
 
         return ev_hit
 
-    def to_evidence_hits(self, response:dict, entity: WatchlistEntity) -> list[EvidenceHit]:
+    def to_evidence_hits(self, response:dict, entity: WatchlistEntity, author_enrich: bool = False) -> list[EvidenceHit]:
         """
 
-        :param response:
-        :param entity:
-        :return:
+        :param response: full /work response from OpenAlexClient
+        :param entity: the entity with which the OpenAlexClient search works method executed the API request
+        :param author_enrich: deeply enriches the authors in list[dict of author] format. see search_authors
+            for more detailed information.
+        :return:  all the /works that were given to it in json/dict format are returned in EvidenceHit format as a list
         """
 
         results = response.get('results', [])
 
         ev_hit_list = []
         for result in results:
-            ev_hit_list.append(self.to_evidence_hit(result, entity))
+            if author_enrich is True:
+                ev_hit_list.append(self.to_evidence_hit(result, entity, author_enrich=True))
+            else:
+                ev_hit_list.append(self.to_evidence_hit(result, entity))
 
         return ev_hit_list
 
