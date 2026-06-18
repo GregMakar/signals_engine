@@ -1,4 +1,7 @@
-# Python
+# macOS
+.DS_Store
+
+# Python bytecode/cache
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,31 +12,34 @@ __pycache__/
 venv/
 env/
 
-# Environment variables / secrets
+# Env/secrets
 .env
 *.env
 clients.env
 
-# OS/editor junk
-.DS_Store
-.vscode/
+# IDE/editor
 .idea/
+.vscode/
 
-# Logs
-*.log
-
-# Build/cache
+# Test/cache
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-dist/
+
+# Build artifacts
 build/
+dist/
 *.egg-info/
 
-# Data/output files
+# Generated data / outputs
+data/
+reports/
+tests/reports/
+*.parquet
 *.csv
 *.zip
-*.parquet
 *.db
-data/
-downloads/
+
+# Scratch files
+scrap.py
+scratch.py
