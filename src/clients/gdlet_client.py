@@ -6,8 +6,9 @@ from pathlib import PurePosixPath
 from datetime import datetime
 import pandas as pd
 from pathlib import Path
-from urllib.request import urlretrieve
 import zipfile
+from src.config_loader import Config, instantiate_config
+from src.models.concept import Concept
 
 
 load_dotenv("/Users/work/Documents/Programming/Palantiresque/Signal Engine/src/clients/clients.env")
@@ -24,7 +25,7 @@ class GDELTIngestor:
                  exports: tuple[str] = ('events', 'mentions'),
                  gdelt_ingestion_csv: str = os.getenv('GDELT_INGESTIONS_CSV'),
                  extract_to: str = os.getenv('GDELT_EXTRACT_TO')
-                 ):
+                 ) -> None:
 
         self.manifest_link = manifest_link
         self.timeout = timeout
@@ -95,7 +96,7 @@ class GDELTIngestor:
         return True
 
 
-    def installer(self):
+    def installer(self) -> list[str]:
         if self.urls_dict is None:
             self.fetch()
 
@@ -131,10 +132,203 @@ class GDELTIngestor:
 
             self.ingestions_data.to_csv(self.gdelt_ingestion_csv, index=False)
 
+        extracted_files_as_strings = [str(path) for path in extracted_files]
 
-        return extracted_files
+        return extracted_files_as_strings
 
 
 
 class GDELTNormalizer:
+    GDELT_EVENT_COLUMNS = [
+        "GLOBALEVENTID",
+        "SQLDATE",
+        "MonthYear",
+        "Year",
+        "FractionDate",
 
+        "Actor1Code",
+        "Actor1Name",
+        "Actor1CountryCode",
+        "Actor1KnownGroupCode",
+        "Actor1EthnicCode",
+        "Actor1Religion1Code",
+        "Actor1Religion2Code",
+        "Actor1Type1Code",
+        "Actor1Type2Code",
+        "Actor1Type3Code",
+
+        "Actor2Code",
+        "Actor2Name",
+        "Actor2CountryCode",
+        "Actor2KnownGroupCode",
+        "Actor2EthnicCode",
+        "Actor2Religion1Code",
+        "Actor2Religion2Code",
+        "Actor2Type1Code",
+        "Actor2Type2Code",
+        "Actor2Type3Code",
+
+        "IsRootEvent",
+        "EventCode",
+        "EventBaseCode",
+        "EventRootCode",
+        "QuadClass",
+        "GoldsteinScale",
+        "NumMentions",
+        "NumSources",
+        "NumArticles",
+        "AvgTone",
+
+        "Actor1Geo_Type",
+        "Actor1Geo_FullName",
+        "Actor1Geo_CountryCode",
+        "Actor1Geo_ADM1Code",
+        "Actor1Geo_ADM2Code",
+        "Actor1Geo_Lat",
+        "Actor1Geo_Long",
+        "Actor1Geo_FeatureID",
+
+        "Actor2Geo_Type",
+        "Actor2Geo_FullName",
+        "Actor2Geo_CountryCode",
+        "Actor2Geo_ADM1Code",
+        "Actor2Geo_ADM2Code",
+        "Actor2Geo_Lat",
+        "Actor2Geo_Long",
+        "Actor2Geo_FeatureID",
+
+        "ActionGeo_Type",
+        "ActionGeo_FullName",
+        "ActionGeo_CountryCode",
+        "ActionGeo_ADM1Code",
+        "ActionGeo_ADM2Code",
+        "ActionGeo_Lat",
+        "ActionGeo_Long",
+        "ActionGeo_FeatureID",
+
+        "DATEADDED",
+        "SOURCEURL",
+    ]
+    GDELT_MENTION_COLUMNS = [
+        "GLOBALEVENTID",
+        "EventTimeDate",
+        "MentionTimeDate",
+        "MentionType",
+        "MentionSourceName",
+        "MentionIdentifier",
+        "SentenceID",
+        "Actor1CharOffset",
+        "Actor2CharOffset",
+        "ActionCharOffset",
+        "InRawText",
+        "Confidence",
+        "MentionDocLen",
+        "MentionDocTone",
+        "MentionDocTranslationInfo",
+        "Extras",
+    ]
+
+    def __init__(self, paths: str | list[str]) -> None:
+        """
+
+        :param paths: it is intended to receive the return value list[str] from GDELTIngestor.installer()
+        """
+        self.paths = paths
+        self.dataframes : dict[str, pd.DataFrame] | None = None
+
+
+    def _delete_file(self, path: str | Path) -> None:
+        path = Path(path)
+
+        if not path.exists():
+            return
+
+        if not path.is_file():
+            raise ValueError(f"Not a file: {path}")
+
+        path.unlink()
+
+    def csv_to_pd(self) -> dict[str, pd.DataFrame]:
+        """
+
+        :return: csv paths that were instantiated converted to dataframes. With the datetime
+         columns are normalized.
+        """
+        dic = {}
+
+        if self.paths[0]:
+            df = pd.read_csv(self.paths[0],
+                             sep="\t",
+                             header=None,
+                             names=self.GDELT_EVENT_COLUMNS,
+                             dtype=str,
+                             parse_dates=['SQLDATE']
+                             )
+
+            # dropping redundant cols
+            df = df.drop(columns=['MonthYear', 'Year', 'FractionDate'])
+
+
+            # parsing date added
+            df['DATEADDED'] = pd.to_datetime(
+                df['DATEADDED'].astype(str),
+                format='%Y%m%d%H%M%S',
+                errors='coerce'
+            )
+
+            dic['events_df'] = df
+
+        if self.paths[1]:
+            m_df = pd.read_csv(
+                self.paths[1],
+                sep='\t',
+                header=None,
+                names=self.GDELT_MENTION_COLUMNS,
+                dtype=str, )
+
+            # parsing EventTimeDate
+            m_df['EventTimeDate'] = pd.to_datetime(
+                m_df['EventTimeDate'].astype(str),
+                format='%Y%m%d%H%M%S',
+                errors='coerce'
+            )
+
+            # parsing MentionTimeDate
+            m_df['MentionTimeDate'] = pd.to_datetime(
+                m_df['MentionTimeDate'].astype(str),
+                format='%Y%m%d%H%M%S',
+                errors='coerce'
+            )
+
+            dic['mentions_df'] = m_df
+
+        if self.paths[2]:
+            ... # gkg logic here
+
+
+        self.dataframes = dic
+
+        return dic
+
+    def matcher(self, dataframes:[pd.DataFrame], gkg_enrich:bool = False) -> pd.DataFrame:
+        """
+        takes events db and mentions db and returns a joint dataframe that
+        :param dataframes: events_df + mentions_df + optionally:gkg_df for further enrichment
+        :param gkg_enrich: bool, set to False, toggle to True to enrich further
+        :return:
+        """
+        config = instantiate_config('/Users/work/Documents/Programming/Palantiresque/Signal Engine/config/watchlist.yaml')
+        concepts = config.concepts
+        entities = config.entities
+
+        if not self.dataframes:
+            self.csv_to_pd()
+
+
+        ...
+
+    def to_evidence_hit(self):
+        ...
+
+    def to_evidence_hits(self):
+        ...
