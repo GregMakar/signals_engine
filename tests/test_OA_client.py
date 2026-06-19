@@ -1,15 +1,10 @@
-from datetime import datetime, timezone
-from pprint import pprint
-from dataclasses import asdict
-from src.config_loader import Config
-from src.models.evidence_hit import EvidenceHit
 from src.services.query_planner import QueryPlanner
 from src.services.concept_matcher import ConceptMatcher
 from src.services.relevance_scorer import RelevanceScorer
 from src.config_loader import instantiate_config
 from src.storage.parquet_store import ParquetStore
 from src.services.report_builder import ReportBuilder
-from src.clients.openalex_client import OpenAlexClient,OpenAlexNormalizer
+from src.sources.openalex.openalex_client import OpenAlexClient,OpenAlexNormalizer
 
 # Instantiate config... Basically read the rules from yaml into python
 config = instantiate_config('../config/watchlist_v2.yaml')

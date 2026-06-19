@@ -7,11 +7,10 @@ from datetime import datetime
 import pandas as pd
 from pathlib import Path
 import zipfile
-from src.config_loader import Config, instantiate_config
-from src.models.concept import Concept
+from src.config_loader import instantiate_config
 
 
-load_dotenv("/Users/work/Documents/Programming/Palantiresque/Signal Engine/src/clients/clients.env")
+load_dotenv(".env")
 
 
 class GDELTIngestor:
@@ -31,7 +30,7 @@ class GDELTIngestor:
         self.timeout = timeout
         self.exports = exports
         self.gdelt_ingestion_csv = gdelt_ingestion_csv
-        self.ingestions_data= pd.read_csv(gdelt_ingestion_csv, parse_dates=['ingestion_timestamp', 'link_timestamp'])
+        self.ingestion_data= pd.read_csv(gdelt_ingestion_csv, parse_dates=['ingestion_timestamp', 'link_timestamp'])
         self.urls_dict = None
         self.extract_to = extract_to
 
@@ -85,7 +84,7 @@ class GDELTIngestor:
         if self.urls_dict is None:
             self.fetch()
 
-        existing_timestamps = set(self.ingestions_data["link_timestamp"])
+        existing_timestamps = set(self.ingestion_data["link_timestamp"])
 
         for url in self.urls_dict.values():
             timestamp = pd.Timestamp(self._date_time_str_parser(url))
@@ -124,13 +123,13 @@ class GDELTIngestor:
                 zip_ref.extractall(extract_dir)
                 extracted_files.extend(extract_dir / name for name in zip_ref.namelist())
 
-            self.ingestions_data.loc[len(self.ingestions_data)] = {
+            self.ingestion_data.loc[len(self.ingestion_data)] = {
                 'ingestion_timestamp': pd.Timestamp.now(),
                 'link_timestamp': pd.to_datetime(self._date_time_str_parser(url)),
                 'type': type.rstrip('_url')
             }
 
-            self.ingestions_data.to_csv(self.gdelt_ingestion_csv, index=False)
+            self.ingestion_data.to_csv(self.gdelt_ingestion_csv, index=False)
 
         extracted_files_as_strings = [str(path) for path in extracted_files]
 
@@ -317,7 +316,7 @@ class GDELTNormalizer:
         :param gkg_enrich: bool, set to False, toggle to True to enrich further
         :return:
         """
-        config = instantiate_config('/Users/work/Documents/Programming/Palantiresque/Signal Engine/config/watchlist.yaml')
+        config = instantiate_config('/config/watchlist.yaml')
         concepts = config.concepts
         entities = config.entities
 

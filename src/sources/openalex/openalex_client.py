@@ -11,7 +11,7 @@ from src.models.watchlist import WatchlistEntity
 """
 The OpenAlex client is solely responsible for fetching RAW API data from OpenAlex in json format.
 """
-load_dotenv('/Users/work/Documents/Programming/Palantiresque/Signal Engine/src/clients/clients.env')
+load_dotenv('.env')
 
 OA_Entities = Literal['works', 'authors', 'sources', 'institutions', 'topics',
                     'domains','fields', 'sub_fields', 'sdgs', 'countries',
@@ -233,8 +233,8 @@ class OpenAlexNormalizer:
 
 
         ev_hit = EvidenceHit(
-            entity_internal_id= entity.id,
-            entity_source_id= work.get('id'),
+            evidence_id= entity.id,
+            hit_source_id= work.get('id'),
             entity_name= entity.name,
             source= 'OpenAlex',
             title= work.get('display_name'),

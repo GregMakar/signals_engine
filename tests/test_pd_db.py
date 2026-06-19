@@ -1,9 +1,24 @@
-import pandas as pd
-from pandas import to_datetime
-import csv
+import re
+from pathlib import Path
 
-pd.set_option("display.max_columns", None)      # show all columns
+import pandas as pd
+
+from src.config_loader import instantiate_config
+
+
+pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)
+
+
+BASE_DIR = Path("/Users/work/Documents/Programming/Palantiresque/Signal Engine")
+
+CONFIG_PATH = BASE_DIR / "config/watchlist.yaml"
+
+EVENTS_PATH = BASE_DIR / "data/raw/gdelt/20260618133000.translation.export.CSV"
+MENTIONS_PATH = BASE_DIR / "data/raw/gdelt/20260618133000.translation.mentions.CSV"
+
+CAMEO_PATH = BASE_DIR / "data/references/cameo_event_codes.csv"
+
 
 GDELT_EVENT_COLUMNS = [
     "GLOBALEVENTID",
@@ -75,6 +90,8 @@ GDELT_EVENT_COLUMNS = [
     "DATEADDED",
     "SOURCEURL",
 ]
+
+
 GDELT_MENTION_COLUMNS = [
     "GLOBALEVENTID",
     "EventTimeDate",
@@ -95,57 +112,218 @@ GDELT_MENTION_COLUMNS = [
 ]
 
 
-events_df = pd.read_csv('/Users/work/Documents/Programming/Palantiresque/Signal Engine/data/raw/gdelt/20260617171500.translation.export.CSV',
-                 sep="\t",
-                 header=None,
-                 names=GDELT_EVENT_COLUMNS,
-                 dtype=str,
-                 parse_dates=['SQLDATE'])
+def load_events(events_path: Path, cameo_path: Path) -> pd.DataFrame:
+    events_df = pd.read_csv(
+        events_path,
+        sep="\t",
+        header=None,
+        names=GDELT_EVENT_COLUMNS,
+        dtype=str,
+    )
 
-# dropping redundant cols
-events_df = events_df.drop(columns=['MonthYear','Year','FractionDate'])
+    events_df = events_df.drop(
+        columns=["MonthYear", "Year", "FractionDate"],
+        errors="ignore",
+    )
 
-# parsing date added
-events_df['DATEADDED'] = pd.to_datetime(
-    events_df['DATEADDED'].astype(str),
-    format= '%Y%m%d%H%M%S',
-    errors='coerce'
-)
+    events_df["SQLDATE"] = pd.to_datetime(
+        events_df["SQLDATE"],
+        format="%Y%m%d",
+        errors="coerce",
+    )
+
+    events_df["DATEADDED"] = pd.to_datetime(
+        events_df["DATEADDED"],
+        format="%Y%m%d%H%M%S",
+        errors="coerce",
+    )
+
+    cameo_df = pd.read_csv(cameo_path, dtype=str)
+
+    cameo_lookup = dict(
+        zip(
+            cameo_df["CAMEOEVENTCODE"],
+            cameo_df["EVENTDESCRIPTION"],
+        )
+    )
+
+    events_df["CAMEO_human_readable"] = events_df["EventCode"].map(cameo_lookup)
+
+    return events_df
 
 
+def load_mentions(mentions_path: Path) -> pd.DataFrame:
+    mentions_df = pd.read_csv(
+        mentions_path,
+        sep="\t",
+        header=None,
+        names=GDELT_MENTION_COLUMNS,
+        dtype=str,
+    )
 
-mentions_df = pd.read_csv('/Users/work/Documents/Programming/Palantiresque/Signal Engine/data/raw/gdelt/20260617171500.translation.mentions.CSV',
-                          sep='\t',
-                          header=None,
-                          names=GDELT_MENTION_COLUMNS,
-                          dtype=str,)
+    mentions_df["EventTimeDate"] = pd.to_datetime(
+        mentions_df["EventTimeDate"],
+        format="%Y%m%d%H%M%S",
+        errors="coerce",
+    )
 
-# parsing EventTimeDate
-mentions_df['EventTimeDate'] = pd.to_datetime(
-    mentions_df['EventTimeDate'].astype(str),
-    format= '%Y%m%d%H%M%S',
-    errors='coerce'
-)
+    mentions_df["MentionTimeDate"] = pd.to_datetime(
+        mentions_df["MentionTimeDate"],
+        format="%Y%m%d%H%M%S",
+        errors="coerce",
+    )
 
-# parsing MentionTimeDate
-mentions_df['MentionTimeDate'] = pd.to_datetime(
-    mentions_df['MentionTimeDate'].astype(str),
-    format= '%Y%m%d%H%M%S',
-    errors='coerce'
-)
+    return mentions_df
 
-cameo_path = "/Users/work/Documents/Programming/Palantiresque/Signal Engine/data/references/cameo_event_codes.csv"
 
-cameo_df = pd.read_csv(cameo_path, dtype=str)
+def match_concepts(
+    events_df: pd.DataFrame,
+    concepts: dict,
+    cols: list[str],
+) -> pd.DataFrame:
+    matched_dfs = []
 
-cameo_lookup= dict(zip(cameo_df["CAMEOEVENTCODE"], cameo_df["EVENTDESCRIPTION"]))
+    existing_cols = [col for col in cols if col in events_df.columns]
 
-events_df["CAMEO_human_readable"] = (
-    events_df["EventCode"]
-    .astype(str)
-    .map(cameo_lookup)
-)
+    if not existing_cols:
+        raise ValueError(f"None of these columns exist in events_df: {cols}")
 
-print(events_df.head())
-print(mentions_df.head())
-print(events_df.columns)
+    for concept_id, concept in concepts.items():
+        terms = [term for term in concept.terms if term]
+
+        if not terms:
+            continue
+
+        pattern = "(" + "|".join(re.escape(term) for term in terms) + ")"
+
+        contains_df = (
+            events_df[existing_cols]
+            .astype("string")
+            .apply(
+                lambda col: col.str.contains(
+                    pattern,
+                    case=False,
+                    na=False,
+                    regex=True,
+                )
+            )
+        )
+
+        mask = contains_df.any(axis=1)
+
+        if not mask.any():
+            continue
+
+        matched = events_df.loc[mask].copy()
+
+        matched["concept_id"] = concept_id
+        matched["concept_description"] = concept.description
+        matched["concept_score"] = concept.score
+
+        matched["matched_columns"] = contains_df.loc[mask].apply(
+            lambda row: list(row.index[row.to_numpy()]),
+            axis=1,
+        )
+
+        matched["matched_terms"] = (
+            events_df.loc[mask, existing_cols]
+            .astype("string")
+            .apply(
+                lambda row: sorted(
+                    {
+                        match.lower()
+                        for value in row.dropna()
+                        for match in re.findall(
+                            pattern,
+                            str(value),
+                            flags=re.IGNORECASE,
+                        )
+                    }
+                ),
+                axis=1,
+            )
+        )
+
+        matched_dfs.append(matched)
+
+    if not matched_dfs:
+        return pd.DataFrame()
+
+    return pd.concat(matched_dfs, ignore_index=True)
+
+
+def main() -> None:
+    config = instantiate_config(CONFIG_PATH)
+    concepts = config.concepts
+
+    events_df = load_events(EVENTS_PATH, CAMEO_PATH)
+    mentions_df = load_mentions(MENTIONS_PATH)
+
+    print("\nEVENTS HEAD:")
+    print(events_df.head())
+
+    print("\nMENTIONS HEAD:")
+    print(mentions_df.head())
+
+    print("\nCAMEO MAPPING CHECK:")
+    print(events_df[["EventCode", "CAMEO_human_readable"]].head(20))
+    print(
+        "\nCAMEO missing ratio:",
+        events_df["CAMEO_human_readable"].isna().mean(),
+    )
+
+    cols_to_match = [
+        "CAMEO_human_readable",
+        "Actor1Name",
+        "Actor2Name",
+        "Actor1Geo_FullName",
+        "Actor2Geo_FullName",
+        "ActionGeo_FullName",
+        "SOURCEURL",
+    ]
+
+    matches_df = match_concepts(
+        events_df=events_df,
+        concepts=concepts,
+        cols=cols_to_match,
+    )
+
+    print("\nMATCHES:")
+    print(matches_df)
+
+    print("\nMATCH COUNT:", len(matches_df))
+
+    if not matches_df.empty:
+        print("\nMATCH SUMMARY BY CONCEPT:")
+        print(
+            matches_df
+            .groupby(["concept_id", "concept_score"])
+            .size()
+            .reset_index(name="match_count")
+            .sort_values(["concept_score", "match_count"], ascending=False)
+        )
+
+        print("\nSELECTED MATCH COLUMNS:")
+        print(
+            matches_df[
+                [
+                    "GLOBALEVENTID",
+                    "SQLDATE",
+                    "DATEADDED",
+                    "EventCode",
+                    "CAMEO_human_readable",
+                    "Actor1Name",
+                    "Actor2Name",
+                    "ActionGeo_FullName",
+                    "concept_id",
+                    "concept_score",
+                    "matched_columns",
+                    "matched_terms",
+                    "SOURCEURL",
+                ]
+            ].head(50)
+        )
+
+
+if __name__ == "__main__":
+    main()
