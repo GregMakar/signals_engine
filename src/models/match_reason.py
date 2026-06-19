@@ -10,6 +10,7 @@ MatcherType = Literal[
     "concept_keyword",
     "url_keyword",
     "source_name",
+    "query"
 ]
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class MatchReason:
 
     matcher: MatcherType
     field: str
-    value: str
+    cameo_value: str
     matched_id: str
     matched_label: str | None = None
     weight: float = 0.0

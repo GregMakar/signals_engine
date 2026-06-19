@@ -3,9 +3,11 @@ import time
 import os
 from dotenv import load_dotenv
 from typing import Any, Self, Literal
-from urllib.parse import urlencode, quote
-
+from datetime import date, datetime
 from src.models.evidence_hit import EvidenceHit
+from src.models.match_reason import MatchReason
+from src.models.source_ref import SourceRecordRef
+from src.models.types import HitScope
 from src.models.watchlist import WatchlistEntity
 
 """
@@ -160,6 +162,10 @@ class OpenAlexClient:
         return self.get_json_list(
             entity='works',
             search=query,
+            _filter= {
+                "from_publication_date": "2016-01-01",
+                "to_publication_date": str(date.today()),
+            },
             per_page=per_page,
             select=[
                 'id',
@@ -207,6 +213,17 @@ class OpenAlexClient:
 
 
 class OpenAlexNormalizer:
+    def __init__(self):
+        self.meta = None
+
+    def to_rec_ref(self, work: dict) -> SourceRecordRef:
+        return SourceRecordRef(
+            source='OpenAlex',
+            dataset='works',
+            source_record_id=work.get('id', ''),
+            batch_id= f"OA/{str(date.today())}", # this needs to have a schedueler specific ID eventually
+        )
+
     def to_evidence_hit(self, work:dict, entity:WatchlistEntity, author_enrich: bool = False) -> EvidenceHit:
         """
         converts a single works entity OA json response into an internal EvidenceHit instance
@@ -217,6 +234,7 @@ class OpenAlexNormalizer:
         :return: EvidenceHit Object
         """
 
+        # gets authors variable in EvidenceHit
         authors = []
         if author_enrich is True:
             client = OpenAlexClient()
@@ -231,23 +249,33 @@ class OpenAlexNormalizer:
             authors = [author['author']['display_name'] for author in work['authorships']]
 
 
-
         ev_hit = EvidenceHit(
-            evidence_id= entity.id,
-            hit_source_id= work.get('id'),
-            entity_name= entity.name,
-            source= 'OpenAlex',
+            evidence_id= f'OpenAlex:{work.get("id", "").lstrip("https://openalex.org/")}',
+            record_ref=self.to_rec_ref(work),
+            hit_scope= 'direct', # "oql": "works where full text has (natural language processing)",
+            subject_entity_id= entity.id,
+            subject_entity_name=entity.name,
+            related_entity_ids= entity.related_entities,
             title= work.get('display_name'),
             language= work.get('language'),
-            _format= work.get('type'),
+            content_type= work.get('type'),
             url= work.get('primary_location').get('landing_page_url', work.get('id')),
             published_at= work.get('publication_date'),
-            publisher_inst= work.get('institutions'),
+            collected_at=datetime.now(),
+            geography= work.get('countries'),
             authors=authors,
-            description=work.get('display_name'),
+            publishers= work['authorships']['institutions'].get('display_name'),
+            source_fields={'oa_id': work.get('id'), 'funders': work.get('funders'),
+                           'institutions': work['authorships']['institutions'].get('display_name')},
+            match_reasons=[MatchReason(
+                matcher="query",
+                field='full text to title query match',
+                cameo_value='',
+                matched_id= self.meta['x_query']['oqo']['filter_rows'][0].get('value'),
+                matched_label=self.meta['x_query'].get('oql'),
+                metadata= self.meta,
+            )]
         )
-
-        ev_hit.freeze()
 
         return ev_hit
 
@@ -260,7 +288,7 @@ class OpenAlexNormalizer:
             for more detailed information.
         :return:  all the /works that were given to it in json/dict format are returned in EvidenceHit format as a list
         """
-
+        self.meta = response.get('meta', {})
         results = response.get('results', [])
 
         ev_hit_list = []

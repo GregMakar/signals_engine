@@ -18,6 +18,19 @@ class CandidateHit:
 
     Main purpose:
         Explain why a raw source row survived the DataFrame filter.
+
+    a CandidateHit graduates to EvidenceHit only if it...
+    1. Has a source record ID (GDELT)_
+    2. Has at least one meaningful match reason
+    3. Has a usable event/date/time
+    4. Has either:
+       - direct entity match
+       - related entity match
+       - valid context/concept match
+    5. Has enough source provenance to trace it back
+    6. Is not obviously excluded by negative terms/rules
+    7. Can be mapped into the generic EvidenceHit schema
+
     """
 
     record_ref: SourceRecordRef

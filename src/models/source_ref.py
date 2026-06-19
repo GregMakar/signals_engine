@@ -14,8 +14,8 @@ class SourceRecordRef:
 )
     """
     source: str
-    dataset: str
+    dataset: str | None
     source_record_id: str
     batch_id: str
-    raw_event_path: str | None = None
-    raw_mentions_path: str | None = None
+    raw_event_path: str | None = None # GDLET
+    raw_mentions_path: str | None = None # GDLET
