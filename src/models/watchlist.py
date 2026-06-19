@@ -13,6 +13,7 @@ class WatchlistEntity:
     entity_type: str
     priority: str
     manual_aliases: list[str]
+    source_filters: dict[str, dict[str, str | bool]]
     identifiers: Identifiers = field(default_factory=Identifiers)
     related_entities: list[str] = field(default_factory=list)
     priority_concepts: list[str] = field(default_factory=list)

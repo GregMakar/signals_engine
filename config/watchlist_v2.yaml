@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 project:
   name: capital_relevant_watchlist_engine
@@ -8,28 +8,45 @@ project:
 
 settings:
   max_results_per_query: 25
-  require_entity_match: True
+  require_entity_match: true
   min_relevance_score: 4
   high_relevance_score: 8
   medium_relevance_score: 4
 
+  # Global source behavior. Entity-specific source_filters can override this.
+  source_filters:
+    gdelt:
+      enabled: true
+      require_entity_match: true
+      require_concept_match: true
+      use_concept_cameo_codes: true
+    openalex:
+      enabled: true
+      require_entity_match: true
+      require_concept_match: false
+    wikidata:
+      enabled: true
+      require_entity_match: true
+    sec:
+      enabled: false
+      require_entity_match: true
+
 sources:
   openalex:
-    enabled: True
+    enabled: true
     purpose: research_trend_monitoring
 
   gdelt:
-    enabled: True
+    enabled: true
     purpose: news_and_event_monitoring
 
   wikidata:
-    enabled: True
+    enabled: true
     purpose: entity_resolution_and_alias_expansion
 
   sec:
-    enabled: False
+    enabled: false
     purpose: public_company_filing_monitoring
-
 
 entities:
   - id: chile
@@ -52,40 +69,15 @@ entities:
       - lithium_supply
       - political_risk
       - environmental_pressure
-    negative_terms: []
-    gdelt_cameo_groups:
-      - political_risk
-      - environmental_pressure
       - regulatory_pressure
-      - labor_disruption
       - export_disruption
-      - commodity_supply
-    high_signal_cameo_codes:
-      - "090"   # Investigate
-      - "091"   # Investigate crime / corruption
-      - "092"   # Investigate human rights abuses
-      - "101"   # Demand information / investigation
-      - "102"   # Demand policy support
-      - "109"   # Demand rights
-      - "111"   # Criticize / denounce
-      - "112"   # Accuse
-      - "114"   # Official complaint
-      - "125"   # Defy norms / law
-      - "127"   # Veto
-      - "1312"  # Threaten boycott / embargo
-      - "132"   # Ultimatum
-      - "140"   # Civilian protest
-      - "141"   # Demonstrate
-      - "143"   # Strike / boycott
-      - "144"   # Physical obstruction
-      - "145"   # Violent protest / riot
-      - "161"   # Reduce diplomatic relations
-      - "166"   # Embargo / boycott
-      - "171"   # Seize / damage property
-      - "1711"  # Confiscate property
-      - "1712"  # Destroy property
-      - "172"   # Administrative sanctions
-      - "173"   # Arrest / detention
+      - labor_disruption
+    negative_terms: []
+    source_filters:
+      gdelt:
+        match_mode: actor_or_location_or_text
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
   - id: codelco
     name: Codelco
@@ -95,6 +87,9 @@ entities:
       - Codelco
       - CODELCO
       - Corporación Nacional del Cobre
+      - Corporacion Nacional del Cobre
+      - Corporación Nacional del Cobre de Chile
+      - Corporacion Nacional del Cobre de Chile
       - National Copper Corporation of Chile
     related_entities:
       - chile
@@ -106,40 +101,13 @@ entities:
       - copper_supply
       - production_risk
       - environmental_pressure
-    negative_terms: []
-    gdelt_cameo_groups:
-      - labor_disruption
-      - mining_disruption
-      - copper_supply
-      - production_risk
-      - environmental_pressure
       - regulatory_pressure
-    high_signal_cameo_codes:
-      - "0311"  # Agree to cooperate economically
-      - "061"   # Cooperate economically
-      - "066"   # Sign formal agreement
-      - "0813"  # Ease strike / boycott
-      - "090"   # Investigate
-      - "091"   # Investigate crime / corruption
-      - "101"   # Demand information / investigation
-      - "102"   # Demand policy support
-      - "109"   # Demand rights
-      - "111"   # Criticize / denounce
-      - "112"   # Accuse
-      - "114"   # Official complaint
-      - "125"   # Defy norms / law
-      - "126"   # Deny responsibility
-      - "1312"  # Threaten boycott / embargo / strike-like disruption
-      - "132"   # Ultimatum
-      - "143"   # Strike / boycott
-      - "144"   # Physical obstruction
-      - "145"   # Violent protest / riot
-      - "166"   # Embargo / boycott
-      - "171"   # Seize / damage property
-      - "1711"  # Confiscate property
-      - "1712"  # Destroy property
-      - "172"   # Administrative sanctions
-      - "173"   # Arrest / detention
+    negative_terms: []
+    source_filters:
+      gdelt:
+        match_mode: actor_or_text
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
   - id: copper
     name: copper
@@ -152,6 +120,11 @@ entities:
       - copper concentrate
       - copper production
       - copper exports
+      - copper cathode
+      - cathode copper
+      - refined copper
+      - LME copper
+      - copper smelting
     related_entities:
       - chile
       - codelco
@@ -163,38 +136,17 @@ entities:
       - production_risk
       - export_disruption
       - inventory_pressure
+      - labor_disruption
+      - regulatory_pressure
     negative_terms:
       - copper color
       - copper cookware
       - copper jewelry
-    gdelt_cameo_groups:
-      - commodity_supply
-      - mining_disruption
-      - production_risk
-      - export_disruption
-      - labor_disruption
-      - regulatory_pressure
-    high_signal_cameo_codes:
-      - "0311"  # Agree to cooperate economically
-      - "061"   # Cooperate economically
-      - "066"   # Sign formal agreement
-      - "0813"  # Ease strike / boycott
-      - "101"   # Demand investigation
-      - "102"   # Demand policy support
-      - "111"   # Criticize / denounce
-      - "112"   # Accuse
-      - "114"   # Official complaint
-      - "125"   # Defy norms / law
-      - "1312"  # Threaten boycott / embargo
-      - "143"   # Strike / boycott
-      - "144"   # Physical obstruction
-      - "145"   # Violent protest / riot
-      - "166"   # Embargo / boycott
-      - "171"   # Seize / damage property
-      - "1712"  # Destroy property
-      - "172"   # Administrative sanctions
-      - "190"   # Severe conventional force disruption only
-      - "191"   # Severe armed blockade / movement restriction only
+    source_filters:
+      gdelt:
+        match_mode: text_or_related_entity
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
   - id: lithium
     name: lithium
@@ -207,51 +159,29 @@ entities:
       - lithium carbonate
       - lithium hydroxide
       - lithium supply
+      - brine lithium
+      - lithium brine
+      - salar
     related_entities:
       - chile
       - batteries
       - electric vehicles
+      - sqm
+      - albemarle
     priority_concepts:
       - lithium_supply
       - mining_disruption
       - environmental_pressure
+      - regulatory_pressure
       - battery_supply_chain
     negative_terms:
       - lithium medication
       - bipolar disorder
-    gdelt_cameo_groups:
-      - commodity_supply
-      - mining_disruption
-      - environmental_pressure
-      - regulatory_pressure
-      - battery_supply_chain
-    high_signal_cameo_codes:
-      - "014"   # Consider policy option
-      - "021"   # Appeal for investigation
-      - "022"   # Appeal for policy support
-      - "0311"  # Agree to cooperate economically
-      - "061"   # Cooperate economically
-      - "066"   # Sign formal agreement
-      - "090"   # Investigate
-      - "091"   # Investigate crime / corruption
-      - "092"   # Investigate human rights abuses
-      - "101"   # Demand investigation
-      - "102"   # Demand policy support
-      - "109"   # Demand rights
-      - "111"   # Criticize / denounce
-      - "112"   # Accuse
-      - "114"   # Official complaint
-      - "125"   # Defy norms / law
-      - "127"   # Veto
-      - "140"   # Civilian protest
-      - "141"   # Demonstrate
-      - "143"   # Strike / boycott
-      - "144"   # Physical obstruction
-      - "145"   # Violent protest / riot
-      - "166"   # Embargo / boycott
-      - "1711"  # Confiscate / expropriate property
-      - "1712"  # Destroy property
-      - "172"   # Administrative sanctions
+    source_filters:
+      gdelt:
+        match_mode: text_or_related_entity
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
   - id: grid_storage
     name: grid storage
@@ -274,33 +204,14 @@ entities:
       - infrastructure_growth
       - battery_supply_chain
       - energy_transition
-    negative_terms: []
-    gdelt_cameo_groups:
-      - infrastructure_growth
-      - battery_supply_chain
-      - energy_transition
       - regulatory_pressure
       - environmental_pressure
-    high_signal_cameo_codes:
-      - "014"   # Consider policy option
-      - "022"   # Appeal for policy support
-      - "032"   # Agree to provide policy support
-      - "0311"  # Agree to cooperate economically
-      - "061"   # Cooperate economically
-      - "066"   # Sign formal agreement
-      - "0231"  # Appeal for economic aid / funding
-      - "0331"  # Agree to provide economic aid
-      - "071"   # Provide economic aid
-      - "101"   # Demand investigation
-      - "102"   # Demand policy support
-      - "111"   # Criticize / denounce
-      - "114"   # Official complaint
-      - "125"   # Defy norms / law
-      - "127"   # Veto
-      - "140"   # Civilian protest
-      - "141"   # Demonstrate
-      - "144"   # Physical obstruction
-      - "172"   # Administrative sanctions
+    negative_terms: []
+    source_filters:
+      gdelt:
+        match_mode: text_or_related_entity
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
   - id: solid_state_batteries
     name: solid-state batteries
@@ -322,30 +233,13 @@ entities:
       - battery_supply_chain
       - commercialization
       - manufacturing_scaleup
-    negative_terms: []
-    gdelt_cameo_groups:
-      - research_momentum
-      - commercialization
-      - manufacturing_scaleup
-      - battery_supply_chain
       - regulatory_pressure
-    high_signal_cameo_codes:
-      - "014"   # Consider policy option
-      - "022"   # Appeal for policy support
-      - "032"   # Agree to provide policy support
-      - "0311"  # Agree to cooperate economically
-      - "061"   # Cooperate economically
-      - "066"   # Sign formal agreement
-      - "0231"  # Appeal for economic aid / funding
-      - "0331"  # Agree to provide economic aid
-      - "071"   # Provide economic aid
-      - "090"   # Investigate
-      - "091"   # Investigate crime / corruption
-      - "111"   # Criticize / denounce
-      - "112"   # Accuse
-      - "125"   # Defy norms / law
-      - "166"   # Embargo / boycott
-      - "172"   # Administrative sanctions
+    negative_terms: []
+    source_filters:
+      gdelt:
+        match_mode: text_or_related_entity
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
   - id: freeport_mcmoran
     name: Freeport-McMoRan
@@ -355,6 +249,10 @@ entities:
       - Freeport-McMoRan
       - Freeport McMoRan
       - Freeport-McMoRan Inc
+      - Freeport-McMoRan Copper & Gold
+      - Freeport McMoRan Copper & Gold
+      - PT Freeport Indonesia
+      - Grasberg
       - FCX
     identifiers:
       ticker: FCX
@@ -370,45 +268,14 @@ entities:
       - production_risk
       - regulatory_pressure
       - environmental_pressure
-    negative_terms: []
-    gdelt_cameo_groups:
-      - copper_supply
-      - mining_disruption
-      - production_risk
-      - regulatory_pressure
-      - environmental_pressure
       - labor_disruption
-    high_signal_cameo_codes:
-      - "0311"  # Agree to cooperate economically
-      - "061"   # Cooperate economically
-      - "066"   # Sign formal agreement
-      - "0813"  # Ease strike / boycott
-      - "090"   # Investigate
-      - "091"   # Investigate crime / corruption
-      - "092"   # Investigate human rights abuses
-      - "101"   # Demand investigation
-      - "102"   # Demand policy support
-      - "109"   # Demand rights
-      - "111"   # Criticize / denounce
-      - "112"   # Accuse
-      - "114"   # Official complaint
-      - "125"   # Defy norms / law
-      - "126"   # Deny responsibility
-      - "1312"  # Threaten boycott / embargo / strike-like disruption
-      - "132"   # Ultimatum
-      - "143"   # Strike / boycott
-      - "144"   # Physical obstruction
-      - "145"   # Violent protest / riot
-      - "166"   # Embargo / boycott
-      - "171"   # Seize / damage property
-      - "1711"  # Confiscate / expropriate property
-      - "1712"  # Destroy property
-      - "172"   # Administrative sanctions
-      - "173"   # Arrest / detention
-      - "174"   # Expel
-      - "190"   # Severe conflict disruption only
-      - "191"   # Severe blockade / movement restriction only
-
+      - export_disruption
+    negative_terms: []
+    source_filters:
+      gdelt:
+        match_mode: actor_or_text
+        require_concept_match: true
+        use_concept_cameo_codes: true
 
 concepts:
   labor_disruption:
@@ -437,6 +304,7 @@ concepts:
       - labor conflict
       - labour conflict
     gdelt:
+      severity_weight: 1.4
       cameo_codes:
         - "143"   # Conduct strike or boycott
         - "144"   # Obstruct physically
@@ -470,6 +338,7 @@ concepts:
       - operational disruption
       - operational issues
     gdelt:
+      severity_weight: 1.5
       cameo_codes:
         - "143"   # Strike or boycott
         - "144"   # Physical obstruction / blockade-style protest
@@ -501,11 +370,14 @@ concepts:
       - copper shortage
       - copper inventories
       - refined copper
+      - copper cathode
+      - cathode copper
       - copper smelter
       - copper shipment
       - copper market
       - copper prices
     gdelt:
+      severity_weight: 1.25
       cameo_codes:
         - "061"   # Cooperate economically
         - "066"   # Sign formal agreement
@@ -534,8 +406,11 @@ concepts:
       - lithium shortage
       - lithium demand
       - lithium brine
+      - brine lithium
       - lithium project
+      - salar
     gdelt:
+      severity_weight: 1.25
       cameo_codes:
         - "061"   # Cooperate economically
         - "066"   # Sign formal agreement
@@ -570,6 +445,7 @@ concepts:
       - bottleneck
       - bottlenecks
     gdelt:
+      severity_weight: 1.4
       cameo_codes:
         - "143"   # Strike or boycott
         - "144"   # Physical obstruction / blockade-style protest
@@ -605,6 +481,7 @@ concepts:
       - supply route
       - export restrictions
     gdelt:
+      severity_weight: 1.35
       cameo_codes:
         - "1312"  # Threaten boycott / embargo
         - "166"   # Impose embargo / boycott
@@ -654,6 +531,7 @@ concepts:
       - antitrust
       - enforcement action
     gdelt:
+      severity_weight: 1.25
       cameo_codes:
         - "021"   # Appeal for information / investigation
         - "090"   # Investigate
@@ -693,6 +571,7 @@ concepts:
       - indigenous community
       - climate risk
     gdelt:
+      severity_weight: 1.25
       cameo_codes:
         - "021"   # Appeal for information / investigation
         - "090"   # Investigate
@@ -711,7 +590,6 @@ concepts:
         - "144"   # Physical obstruction
         - "172"   # Administrative sanctions
 
-
   political_risk:
     id: political_risk
     description: Political instability, policy shifts, elections, nationalization, taxes, or state intervention.
@@ -723,6 +601,7 @@ concepts:
       - royalty increase
       - tax increase
       - nationalization
+      - nationalisation
       - state control
       - government intervention
       - election uncertainty
@@ -732,6 +611,7 @@ concepts:
       - export ban
       - trade restriction
     gdelt:
+      severity_weight: 1.2
       cameo_codes:
         - "090"   # Investigate
         - "091"   # Investigate crime / corruption
@@ -783,6 +663,7 @@ concepts:
     score: 2
     terms:
       - commercialization
+      - commercialisation
       - commercial deployment
       - pilot project
       - demonstration project
@@ -796,6 +677,7 @@ concepts:
       - commercial launch
       - first deployment
     gdelt:
+      severity_weight: 0.8
       cameo_codes:
         - "014"   # Consider policy option
         - "022"   # Appeal for policy support
@@ -827,6 +709,19 @@ concepts:
       - production ramp
       - ramp-up
       - manufacturing bottleneck
+    gdelt:
+      severity_weight: 0.9
+      cameo_codes:
+        - "014"   # Consider policy option
+        - "022"   # Appeal for policy support
+        - "032"   # Agree to provide policy support
+        - "0311"  # Agree to cooperate economically
+        - "061"   # Cooperate economically
+        - "066"   # Sign formal agreement
+        - "0231"  # Appeal for economic aid
+        - "0331"  # Agree to provide economic aid
+        - "071"   # Provide economic aid
+        - "172"   # Administrative sanctions
 
   battery_supply_chain:
     id: battery_supply_chain
@@ -847,6 +742,7 @@ concepts:
       - critical minerals
       - raw materials
     gdelt:
+      severity_weight: 1.0
       cameo_codes:
         - "014"   # Consider policy option
         - "022"   # Appeal for policy support
@@ -873,10 +769,12 @@ concepts:
       - utility-scale
       - grid upgrade
       - grid modernization
+      - grid modernisation
       - energy infrastructure
       - storage deployment
       - renewable integration
     gdelt:
+      severity_weight: 0.8
       cameo_codes:
         - "014"   # Consider policy option
         - "022"   # Appeal for policy support
@@ -905,7 +803,18 @@ concepts:
       - EV demand
       - grid demand
       - battery demand
-
+    gdelt:
+      severity_weight: 0.7
+      cameo_codes:
+        - "014"   # Consider policy option
+        - "022"   # Appeal for policy support
+        - "032"   # Agree to provide policy support
+        - "0311"  # Agree to cooperate economically
+        - "061"   # Cooperate economically
+        - "066"   # Sign formal agreement
+        - "0231"  # Appeal for economic aid
+        - "0331"  # Agree to provide economic aid
+        - "071"   # Provide economic aid
 
 scoring:
   entity_match:
@@ -915,7 +824,23 @@ scoring:
     related_entity: 1
 
   concept_match:
-    use_concept_score: True
+    use_concept_score: true
+
+  gdelt:
+    concept_cameo_match: 2
+    severe_cameo_match: 3
+    apply_concept_severity_weight: true
+    severe_cameo_codes:
+      - "143"   # Strike or boycott
+      - "144"   # Physical obstruction
+      - "145"   # Violent protest / riot
+      - "166"   # Embargo / boycott
+      - "171"   # Seize or damage property
+      - "1711"  # Confiscate property
+      - "1712"  # Destroy property
+      - "172"   # Administrative sanctions
+      - "190"   # Use conventional force
+      - "191"   # Blockade / restrict movement
 
   source_weight:
     gdelt: 1
@@ -935,6 +860,8 @@ scoring:
     missing_date: -1
     missing_url: -1
     weak_entity_match: -2
+    cameo_without_concept_match: -2
+    concept_without_entity_match: -3
 
   labels:
     high:
@@ -943,7 +870,6 @@ scoring:
       min_score: 4
     low:
       min_score: 0
-
 
 query_templates:
   gdelt:
@@ -1015,44 +941,3 @@ query_templates:
   wikidata:
     all:
       - "{entity}"
-
-cameo_groups:
-  labor_disruption:
-    codes: ["143", "144", "145", "140", "141", "1312", "132", "0813"]
-    severity_weight: 1.4
-
-  mining_disruption:
-    codes: ["143", "144", "145", "171", "1711", "1712", "172", "173", "1312", "166", "125", "190", "191"]
-    severity_weight: 1.5
-
-  commodity_supply:
-    codes: ["0311", "061", "066", "143", "144", "166", "1312", "1712", "172", "0813"]
-    severity_weight: 1.25
-
-  export_disruption:
-    codes: ["1312", "166", "160", "161", "144", "191"]
-    severity_weight: 1.35
-
-  political_risk:
-    codes: ["090", "091", "092", "101", "102", "109", "111", "112", "113", "114", "120", "121", "125", "126", "127", "1312", "132", "140", "141", "145", "161", "166", "172", "173"]
-    severity_weight: 1.2
-
-  environmental_pressure:
-    codes: ["021", "090", "091", "092", "101", "102", "109", "111", "112", "114", "125", "127", "140", "141", "144", "172"]
-    severity_weight: 1.25
-
-  battery_supply_chain:
-    codes: ["014", "022", "032", "0311", "061", "066", "0231", "0331", "071", "166", "172"]
-    severity_weight: 1.0
-
-  infrastructure_growth:
-    codes: ["014", "022", "032", "0311", "061", "066", "0231", "0331", "071"]
-    severity_weight: 0.8
-
-  commercialization:
-    codes: ["0311", "061", "066", "0231", "0331", "071", "014", "022", "032"]
-    severity_weight: 0.8
-
-  regulatory_pressure:
-    codes: ["090", "091", "101", "102", "111", "112", "114", "125", "126", "127", "172"]
-    severity_weight: 1.25

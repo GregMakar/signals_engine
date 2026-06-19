@@ -210,6 +210,7 @@ def instantiate_config(yaml_path: str) -> Config:
                             related_entities=entity.get("related_entities", []),
                             priority_concepts=entity.get("priority_concepts", []),
                             negative_terms=entity.get("negative_terms", []),
+                            source_filters=entity.get("source_filters", {})
                         )
                             for entity in entities},
 
@@ -218,6 +219,7 @@ def instantiate_config(yaml_path: str) -> Config:
                             description= concept_data['description'],
                             score= concept_data['score'],
                             terms= concept_data['terms'],
+                            gdelt= concept_data.get('gdelt', {})
                         )
                         for concept_id, concept_data in concepts.items()},
 

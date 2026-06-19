@@ -6,4 +6,5 @@ class Concept:
     description: str
     score: float
     terms: list[str]
+    gdelt: dict[str, float | list[str]]
 
