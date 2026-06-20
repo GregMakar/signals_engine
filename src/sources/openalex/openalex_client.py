@@ -4,6 +4,8 @@ import os
 from dotenv import load_dotenv
 from typing import Any, Self, Literal
 from datetime import date, datetime
+
+from src.config_loader import Config, instantiate_config
 from src.models.evidence_hit import EvidenceHit
 from src.models.match_reason import MatchReason
 from src.models.source_ref import SourceRecordRef
@@ -176,8 +178,9 @@ class OpenAlexClient:
                 'type',
                 'abstract_inverted_index',
                 'authorships',
-                'institutions'
-
+                'institutions',
+                'primary_topic',
+                'topics'
             ]
         )
 
@@ -210,19 +213,101 @@ class OpenAlexClient:
 
         return return_author
 
+    def get_queries(self, entity: WatchlistEntity) -> set[str]:
+        queries = []
+
+        if entity.entity_type in ['company', 'theme']:
+            queries.append(entity.name.lower())
+
+        for alias in entity.manual_aliases:
+            for related_entity in entity.related_entities:
+                query = f'{alias.lower()} {related_entity.replace("_", " ")}'
+                queries.append(query)
+            for prio_concept in entity.priority_concepts:
+                query = f'{alias.lower()} {prio_concept.replace("_", " ")}'
+                queries.append(query)
+
+        return set(queries)
+
+
+
 
 
 class OpenAlexNormalizer:
-    def __init__(self):
+    def __init__(self, config: Config):
         self.meta = None
+        self.config = config
 
-    def to_rec_ref(self, work: dict) -> SourceRecordRef:
+    def _rec_ref_builder(self, work: dict) -> SourceRecordRef:
         return SourceRecordRef(
             source='OpenAlex',
             dataset='works',
             source_record_id=work.get('id', ''),
-            batch_id= f"OA/{str(date.today())}", # this needs to have a schedueler specific ID eventually
+            batch_id= f"OA/{str(date.today())}", # this needs to have a scheduler specific ID eventually
         )
+
+    def _match_builder(self, work: dict, entity: WatchlistEntity) -> list[MatchReason]:
+        filter_rows = self.meta.get('x_query', {}).get('oqo', {}).get('filter_rows', [])
+
+
+        query_used: list[str] = (
+            (filter_rows[0].get('value') or '').split()
+            if filter_rows
+            else []
+        )
+        match_reasons_objs = []
+
+        if query_used[0] in [entity.lower() for entity in entity.manual_aliases]:
+            _ = MatchReason(
+                matcher='entity_alias',
+                field='title',
+                value=work.get('display_name', ''),
+                matched_id=entity.name,
+                matched_label=entity.name,
+                weight= 1.0,
+                reason= 'Exact Name match -- ',
+                metadata={'match_weight': 'Manual'}
+            )
+            match_reasons_objs.append(_)
+
+        for word in query_used:
+            if word.lower() in entity.related_entities:
+                _ = MatchReason(
+                    matcher='related_entity',
+                    field='title',
+                    value=work.get('display_name', ''),
+                    matched_id=word,
+                    weight=0.3,
+                    reason='related entity match',
+                    metadata={'match_weight': 'Manual'}
+                )
+                match_reasons_objs.append(_)
+
+        word = '_'.join(query_used[1:])
+        if word.lower() in entity.priority_concepts:
+            _ = MatchReason(
+                matcher= 'concept_keyword',
+                field= 'title',
+                value= work.get('display_name', ''),
+                matched_id=word,
+                weight= self.config.get_concept(concept_id=word).gdelt.get('severity_weight', 1.0),
+                reason= f'matched priority concept {word}',
+                metadata={'match_weight': 'dynamic',}
+            )
+            match_reasons_objs.append(_)
+
+        if not match_reasons_objs:
+            _ = MatchReason(
+                matcher= 'unknown',
+                field= 'title',
+                value=work.get('display_name', ''),
+                matched_id= ' '.join(query_used),
+                weight=0.1,
+                reason='Unknown',
+                metadata={'match_weight': 'Manual'}
+            )
+
+        return match_reasons_objs
 
     def to_evidence_hit(self, work:dict, entity:WatchlistEntity, author_enrich: bool = False) -> EvidenceHit:
         """
@@ -248,14 +333,42 @@ class OpenAlexNormalizer:
         else:
             authors = [author['author']['display_name'] for author in work['authorships']]
 
+        # Build rec_ref
+        record_ref= self._rec_ref_builder(work)
+
+        # Build list of MatchReason objs
+        matches = self._match_builder(work, entity)
+
+        # Build list of context keys
+        main_topics = [topic for topic in work.get('primary_topic', {}).get('display_name', '')]
+        sec_topics = work.get('topics', [])
+
+        for topic in sec_topics:
+            main_topics.append(topic.get('display_name'))
+
+        cleaned_topics = []
+        for topic in main_topics:
+            topic = topic.lower().replace(' ', '_')
+            cleaned_topics.append(topic)
+
+        if any(match.matcher == 'entity_alias' for match in matches):
+            hit_scope: HitScope = 'direct'
+        elif any(match.matcher == 'related_entity' for match in matches):
+            hit_scope: HitScope = 'related'
+        elif any(match.matcher == 'concept_keyword' for match in matches):
+            hit_scope: HitScope = 'context'
+        else:
+            hit_scope = 'unknown'
+
 
         ev_hit = EvidenceHit(
             evidence_id= f'OpenAlex:{work.get("id", "").lstrip("https://openalex.org/")}',
-            record_ref=self.to_rec_ref(work),
-            hit_scope= 'direct', # "oql": "works where full text has (natural language processing)",
+            record_ref=record_ref,
+            hit_scope= hit_scope, # "oql": "works where full text has (natural language processing)",
             subject_entity_id= entity.id,
             subject_entity_name=entity.name,
             related_entity_ids= entity.related_entities,
+            context_keys= cleaned_topics,
             title= work.get('display_name'),
             language= work.get('language'),
             content_type= work.get('type'),
@@ -267,14 +380,7 @@ class OpenAlexNormalizer:
             publishers= work['authorships']['institutions'].get('display_name'),
             source_fields={'oa_id': work.get('id'), 'funders': work.get('funders'),
                            'institutions': work['authorships']['institutions'].get('display_name')},
-            match_reasons=[MatchReason(
-                matcher="query",
-                field='full text to title query match',
-                cameo_value='',
-                matched_id= self.meta['x_query']['oqo']['filter_rows'][0].get('value'),
-                matched_label=self.meta['x_query'].get('oql'),
-                metadata= self.meta,
-            )]
+            match_reasons=matches
         )
 
         return ev_hit

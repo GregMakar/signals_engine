@@ -280,6 +280,7 @@ entities:
 concepts:
   labor_disruption:
     id: labor_disruption
+    name: labor disruption
     description: Workers, unions, strikes, wage disputes, or labor actions affecting operations.
     score: 3
     terms:
@@ -317,6 +318,7 @@ concepts:
 
   mining_disruption:
     id: mining_disruption
+    name: mining disruption
     description: Mining operations disrupted by shutdowns, accidents, weather, protests, or operational problems.
     score: 3
     terms:
@@ -356,6 +358,7 @@ concepts:
 
   copper_supply:
     id: copper_supply
+    name: copper supply
     description: Evidence related to copper supply, production, demand, exports, shortages, or inventories.
     score: 2
     terms:
@@ -392,6 +395,7 @@ concepts:
 
   lithium_supply:
     id: lithium_supply
+    name: lithium supply
     description: Evidence related to lithium supply, production, exports, extraction, or shortages.
     score: 2
     terms:
@@ -425,6 +429,7 @@ concepts:
 
   production_risk:
     id: production_risk
+    name: production risk
     description: Any language suggesting output, operations, or production capacity may be affected.
     score: 2
     terms:
@@ -463,6 +468,7 @@ concepts:
 
   export_disruption:
     id: export_disruption
+    name: export disruption
     description: Export, port, logistics, or shipment disruptions.
     score: 2
     terms:
@@ -492,6 +498,7 @@ concepts:
 
   inventory_pressure:
     id: inventory_pressure
+    name: inventory pressure
     description: Inventory builds, shortages, drawdowns, or abnormal stockpile movement.
     score: 2
     terms:
@@ -511,6 +518,7 @@ concepts:
 
   regulatory_pressure:
     id: regulatory_pressure
+    name: regulatory pressure
     description: Government, legal, compliance, investigation, permitting, or regulatory pressure.
     score: 2
     terms:
@@ -552,6 +560,7 @@ concepts:
 
   environmental_pressure:
     id: environmental_pressure
+    name: environmental pressure
     description: Environmental, water, pollution, emissions, climate, or community pressure.
     score: 2
     terms:
@@ -592,6 +601,7 @@ concepts:
 
   political_risk:
     id: political_risk
+    name: political risk
     description: Political instability, policy shifts, elections, nationalization, taxes, or state intervention.
     score: 2
     terms:
@@ -640,6 +650,7 @@ concepts:
 
   research_momentum:
     id: research_momentum
+    name: research momentum
     description: Academic or technical research activity around a theme.
     score: 1
     terms:
@@ -659,6 +670,7 @@ concepts:
 
   commercialization:
     id: commercialization
+    name: commercialization
     description: Movement from research/prototype into commercial deployment.
     score: 2
     terms:
@@ -693,6 +705,7 @@ concepts:
 
   manufacturing_scaleup:
     id: manufacturing_scaleup
+    name: manufacturing scaleup
     description: Factory, production, supply-chain, or capacity expansion around technology manufacturing.
     score: 2
     terms:
@@ -725,6 +738,7 @@ concepts:
 
   battery_supply_chain:
     id: battery_supply_chain
+    name: battery supply chain
     description: Battery material, production, supply, demand, or component-chain evidence.
     score: 2
     terms:
@@ -758,6 +772,7 @@ concepts:
 
   infrastructure_growth:
     id: infrastructure_growth
+    name: infrastructure growth
     description: Grid, power, transmission, utility, or infrastructure expansion.
     score: 2
     terms:
@@ -790,6 +805,7 @@ concepts:
 
   energy_transition:
     id: energy_transition
+    name: energy transition
     description: Energy transition themes involving electrification, renewables, batteries, or grid demand.
     score: 1
     terms:
@@ -817,59 +833,218 @@ concepts:
         - "071"   # Provide economic aid
 
 scoring:
-  entity_match:
-    exact_name: 3
-    manual_alias: 3
-    wikidata_alias: 2
-    related_entity: 1
+  version: 1
 
-  concept_match:
-    use_concept_score: true
+  # -------------------------
+  # Relevance: how connected is this hit to the watchlist?
+  # -------------------------
+  relevance:
+    hit_scope:
+      direct: 3.0
+      related: 1.5
+      context: 0.75
+      unknown: 0.1
 
-  gdelt:
-    concept_cameo_match: 2
-    severe_cameo_match: 3
-    apply_concept_severity_weight: true
-    severe_cameo_codes:
-      - "143"   # Strike or boycott
-      - "144"   # Physical obstruction
-      - "145"   # Violent protest / riot
-      - "166"   # Embargo / boycott
-      - "171"   # Seize or damage property
-      - "1711"  # Confiscate property
-      - "1712"  # Destroy property
-      - "172"   # Administrative sanctions
-      - "190"   # Use conventional force
-      - "191"   # Blockade / restrict movement
+    entity_match:
+      entity_alias: 3.0
+      wikidata_alias: 2.0
+      related_entity: 1.0
+      country_code: 1.0
+      geo_match: 1.0
+      cameo_code: 1.0
+      concept_keyword: 0.5
+      url_keyword: 0.5
+      source_name: 0.2
 
-  source_weight:
-    gdelt: 1
-    openalex: 1
-    wikidata: 0
-    sec: 2
+    entity_priority:
+      high: 1.5
+      medium: 0.75
+      low: 0.0
 
+    context_keys:
+      commodity_match: 1.0
+      sector_match: 0.75
+      geography_match: 0.75
+      risk_theme_match: 1.0
+
+  # -------------------------
+  # Severity: how serious is the event/type of evidence?
+  # -------------------------
+  severity:
+    concept_match:
+      use_concept_score: true
+
+
+    concept_weights:
+      default_weight: 1.0
+      labor_disruption: 2.5
+      mining_disruption: 2.25
+      supply_disruption: 2.5
+      sanctions: 3.0
+      regulatory_risk: 2.0
+      armed_conflict: 3.5
+      infrastructure_damage: 3.0
+      export_restriction: 3.0
+      operational_shutdown: 3.25
+      research: 1.0
+
+    gdelt:
+      apply_concept_severity_weight: true
+
+      cameo_exact_weights:
+        "143": 3.0    # Conduct strike or boycott
+        "144": 2.5    # Obstruct physically
+        "145": 3.0    # Violent protest / riot
+        "166": 3.0    # Expel / embargo / boycott-like coercion
+        "171": 3.0    # Seize or damage property
+        "1711": 3.25   # Confiscate property
+        "1712": 3.5    # Destroy property
+        "172": 2.5    # Administrative sanctions
+        "173": 3.0    # Arrest / detain
+        "180": 3.25   # Use unconventional violence
+        "182": 3.5    # Physically assault
+        "183": 3.75   # Conduct suicide/bombing/terror-type action
+        "190": 3.5    # Use conventional military force
+        "191": 3.25   # Blockade / restrict movement
+        "193": 3.75   # Fight with small arms/light weapons
+        "194": 4.0    # Fight with artillery/tanks/heavy weapons
+        "195": 4.0    # Employ aerial weapons
+        "200": 4.5    # Use mass violence
+
+      cameo_root_weights:
+        "10": 1.0     # Demand
+        "11": 1.0     # Disapprove
+        "12": 1.0     # Reject
+        "13": 1.5     # Threaten
+        "14": 2.0     # Protest
+        "15": 2.0     # Exhibit force posture
+        "16": 2.0     # Reduce relations
+        "17": 2.75    # Coerce
+        "18": 3.25    # Assault
+        "19": 3.5     # Fight
+        "20": 4.5     # Mass violence
+
+      severe_cameo_codes:
+        - "143"
+        - "144"
+        - "145"
+        - "166"
+        - "171"
+        - "1711"
+        - "1712"
+        - "172"
+        - "173"
+        - "180"
+        - "182"
+        - "183"
+        - "190"
+        - "191"
+        - "193"
+        - "194"
+        - "195"
+        - "200"
+
+      severe_cameo_bonus: 1.0
+      cameo_without_concept_penalty: -2.0
+
+  # -------------------------
+  # Confidence: how much should we trust the hit?
+  # -------------------------
+  confidence:
+    source_weight:
+      gdelt: 1.0
+      openalex: 1.0
+      wikidata: 0.25
+      sec: 2.0
+
+    gdelt:
+      num_sources:
+        medium_threshold: 3
+        high_threshold: 5
+        medium_weight: 0.5
+        high_weight: 1.0
+
+      num_mentions:
+        medium_threshold: 5
+        high_threshold: 15
+        medium_weight: 0.5
+        high_weight: 1.0
+
+      num_articles:
+        medium_threshold: 3
+        high_threshold: 10
+        medium_weight: 0.5
+        high_weight: 1.0
+
+      mention_confidence:
+        medium_threshold: 40
+        high_threshold: 70
+        medium_weight: 0.5
+        high_weight: 1.0
+
+      has_url_weight: 0.5
+
+    source_quality:
+      known_reliable_source: 1.0
+      unknown_source: 0.0
+      low_quality_source: -1.0
+
+  # -------------------------
+  # Recency: how fresh is the evidence?
+  # -------------------------
   recency:
-    within_1_days: 4
-    within_3_days: 3
-    within_7_days: 2
-    within_14_days: 1
-    older_than_14_days: 0
+    within_1_days: 2.0
+    within_3_days: 1.5
+    within_7_days: 1.0
+    within_14_days: 0.5
+    older_than_14_days: 0.0
+    missing_date: -1.5
 
+  # -------------------------
+  # Novelty: V1 can mostly ignore this
+  # -------------------------
+  novelty:
+    enabled: false
+    first_seen_bonus: 1.0
+    duplicate_penalty: -1.0
+    repeated_same_event_penalty: -0.5
+
+  # -------------------------
+  # Penalties
+  # -------------------------
   penalties:
-    negative_term_match: -3
-    missing_date: -1
-    missing_url: -1
-    weak_entity_match: -2
-    cameo_without_concept_match: -2
-    concept_without_entity_match: -3
+    negative_term_match: -3.0
+    missing_url: -1.0
+    url_404: -2.0
+    missing_date: -1.5
+    weak_entity_match: -2.0
+    concept_without_entity_match: -2.5
+    context_only_low_confidence: -1.0
+    translation_noise: -1.0
+    ambiguous_keyword_match: -1.5
 
+  # -------------------------
+  # Labels for human-readable score output
+  # -------------------------
   labels:
+    critical:
+      min_score: 10.0
     high:
-      min_score: 8
+      min_score: 7.0
     medium:
-      min_score: 4
+      min_score: 4.0
     low:
-      min_score: 0
+      min_score: 0.0
+
+  # -------------------------
+  # Routing decision: what the system should do next
+  # -------------------------
+  routing:
+    ignore_below: 2.0
+    store_only_below: 5.0
+    manual_review_below: 8.0
+    alert_at_or_above: 8.0
+
 
 query_templates:
   gdelt:

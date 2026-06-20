@@ -48,11 +48,14 @@ class ScoringConfig:
     """
     scoring rules
     """
-    entity_match: dict[str, int]
-    source_weight: dict[str, int]
-    recency: dict[str, int]
-    penalties: dict[str, int]
-    labels: dict[str, dict[str, int]]
+    relevance: dict[str, dict[str, float]]
+    severity: dict[str, dict[str, float | bool | dict[str, float] | list[str]]]
+    confidence: dict[str, dict[str, float | dict[str, float]]]
+    recency: dict[str, float]
+    novelty: dict[str, float | bool]
+    penalties: dict[str, float]
+    labels: dict[str, dict[str, float]]
+    routing: dict[str, float]
 
 
 @dataclass(frozen=True)
@@ -216,6 +219,7 @@ def instantiate_config(yaml_path: str) -> Config:
 
                         concepts={concept_id:Concept(
                             id=concept_id,
+                            name= concept_data['name'],
                             description= concept_data['description'],
                             score= concept_data['score'],
                             terms= concept_data['terms'],
@@ -224,11 +228,14 @@ def instantiate_config(yaml_path: str) -> Config:
                         for concept_id, concept_data in concepts.items()},
 
                         scoring=ScoringConfig(
-                            entity_match=raw['scoring']['entity_match'],
-                            source_weight=raw['scoring']['source_weight'],
+                            relevance=raw['scoring']['relevance'],
+                            severity=raw['scoring']['severity'],
+                            confidence=raw['scoring']['confidence'],
                             recency=raw['scoring']['recency'],
+                            novelty=raw['scoring']['novelty'],
                             penalties=raw['scoring']['penalties'],
                             labels=raw['scoring']['labels'],
+                            routing=raw['scoring']['routing'],
                         ),
 
                         query_templates=raw['query_templates']

@@ -253,7 +253,7 @@ def match_concepts(
 
 
 def main() -> None:
-    config = instantiate_config(CONFIG_PATH)
+    config = instantiate_config('/Users/work/Documents/Programming/Palantiresque/Signal Engine/config/watchlist_v2.yaml')
     concepts = config.concepts
 
     events_df = load_events(EVENTS_PATH, CAMEO_PATH)

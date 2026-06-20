@@ -1,7 +1,7 @@
 from typing import Literal, TypeAlias, Any
 
 
-HitScope: TypeAlias = Literal["direct", "related", "context"]
+HitScope: TypeAlias = Literal["direct", "related", "context", "unknown"]
 RoutingDecision: TypeAlias = Literal[
     "ignore",
     "store_only",
