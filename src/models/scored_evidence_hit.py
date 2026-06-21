@@ -27,6 +27,7 @@ class ScoredEvidenceHit:
     relevance_score: float #
     severity_score: float
     confidence_score: float
+    recency_score: float
     novelty_score: float = 0.0
 
     relevance_label: str = "low"

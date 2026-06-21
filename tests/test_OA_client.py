@@ -11,11 +11,11 @@ config = instantiate_config('../config/watchlist_v2.yaml')
 
 # Instantiate the OpenAlex client and normalizer service class
 oa_client = OpenAlexClient()
-oa_client_normalizer = OpenAlexNormalizer()
+oa_client_normalizer = OpenAlexNormalizer(config)
 
 # get WatchlistEntity obj from config (basically from yaml).
 # you're going to execute research on this entity in this instance
-entity = config.get_entity('codelco')
+entity = config.get_entity('grid_storage')
 
 # load the hard coded concepts from config/yaml
 concepts = config.concepts
@@ -26,17 +26,18 @@ matcher = ConceptMatcher(config) # has a method that matches concepts (from conf
 scorer = RelevanceScorer(config) # has a method that scores relevance based on rules for scoring in config/yaml
 
 
-queries = planner.get_query("openalex", entity.id)
+queries = list(oa_client.get_queries(entity=entity))[:10]
 
 print("Generated queries:")
 print(queries)
+print(f"number of queries: {len(queries)}")
 
 all_hits = []
 for query in queries:
     works = oa_client.search_works(query=query) # -> json/dict response for one query
     normalized_hits = oa_client_normalizer.to_evidence_hits(response=works, entity=entity, author_enrich=False) # -> turns all json/dicts to evidence hits in a list
     for hit in normalized_hits:
-        hit.matched_concepts = matcher.match_all(text=hit.matching_text) # -> enrich matched_concepts
+        # hit.matched_concepts = matcher.match_all(text=hit.matching_text) # -> enrich matched_concepts
         scored_hit = scorer.score(hit, entity) # -> enrich scores
         all_hits.append(hit)
 
@@ -45,10 +46,14 @@ print('Storing...')
 store = ParquetStore()
 store.save_records(all_hits, 'openalex_first_test')
 
+print('Stored...')
+
 df = store.load("openalex_first_test")
 
+print('Building Report... ')
+
 report_builder = ReportBuilder()
-report_path = report_builder.build_markdown(df)
+report_path = report_builder.build_markdown(df.head(20))
 
 print(f"Report saved to {report_path}")
 

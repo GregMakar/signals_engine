@@ -1,11 +1,10 @@
 import requests
-import time
 import os
 from dotenv import load_dotenv
-from typing import Any, Self, Literal
+from typing import Literal
 from datetime import date, datetime
 
-from src.config_loader import Config, instantiate_config
+from src.config_loader import Config
 from src.models.evidence_hit import EvidenceHit
 from src.models.match_reason import MatchReason
 from src.models.source_ref import SourceRecordRef
@@ -15,7 +14,7 @@ from src.models.watchlist import WatchlistEntity
 """
 The OpenAlex client is solely responsible for fetching RAW API data from OpenAlex in json format.
 """
-load_dotenv('.env')
+load_dotenv('/Users/work/Documents/Programming/Palantiresque/Signal Engine/.env')
 
 OA_Entities = Literal['works', 'authors', 'sources', 'institutions', 'topics',
                     'domains','fields', 'sub_fields', 'sdgs', 'countries',
@@ -231,8 +230,6 @@ class OpenAlexClient:
 
 
 
-
-
 class OpenAlexNormalizer:
     def __init__(self, config: Config):
         self.meta = None
@@ -240,7 +237,7 @@ class OpenAlexNormalizer:
 
     def _rec_ref_builder(self, work: dict) -> SourceRecordRef:
         return SourceRecordRef(
-            source='OpenAlex',
+            source='openalex',
             dataset='works',
             source_record_id=work.get('id', ''),
             batch_id= f"OA/{str(date.today())}", # this needs to have a scheduler specific ID eventually
@@ -257,12 +254,12 @@ class OpenAlexNormalizer:
         )
         match_reasons_objs = []
 
-        if query_used[0] in [entity.lower() for entity in entity.manual_aliases]:
+        if query_used and query_used[0] in [alias.lower() for alias in entity.manual_aliases]:
             _ = MatchReason(
                 matcher='entity_alias',
                 field='title',
                 value=work.get('display_name', ''),
-                matched_id=entity.name,
+                matched_id=query_used[0],
                 matched_label=entity.name,
                 weight= 1.0,
                 reason= 'Exact Name match -- ',
@@ -289,7 +286,7 @@ class OpenAlexNormalizer:
                 matcher= 'concept_keyword',
                 field= 'title',
                 value= work.get('display_name', ''),
-                matched_id=word,
+                matched_id=word, # concept_id itself that was matched
                 weight= self.config.get_concept(concept_id=word).gdelt.get('severity_weight', 1.0),
                 reason= f'matched priority concept {word}',
                 metadata={'match_weight': 'dynamic',}
@@ -306,6 +303,7 @@ class OpenAlexNormalizer:
                 reason='Unknown',
                 metadata={'match_weight': 'Manual'}
             )
+            match_reasons_objs.append(_)
 
         return match_reasons_objs
 
@@ -325,7 +323,7 @@ class OpenAlexNormalizer:
             client = OpenAlexClient()
             for author in work['authorships']:
                 _id = author['author'].get('id', None)
-                clean_id = _id.lstrip('https://openalex.org/') if _id is not None else None
+                clean_id = _id.removeprefix('https://openalex.org/') if _id is not None else None
                 if clean_id:
                     authors.append(client.search_author(clean_id))
                 else:
@@ -338,9 +336,11 @@ class OpenAlexNormalizer:
 
         # Build list of MatchReason objs
         matches = self._match_builder(work, entity)
+        matched_id, matched_alias = self.enrich_match_id_alias(matches)
 
         # Build list of context keys
-        main_topics = [topic for topic in work.get('primary_topic', {}).get('display_name', '')]
+        primary_topic = work.get("primary_topic") or {}
+        main_topics = [primary_topic.get("display_name", "")]
         sec_topics = work.get('topics', [])
 
         for topic in sec_topics:
@@ -360,9 +360,12 @@ class OpenAlexNormalizer:
         else:
             hit_scope = 'unknown'
 
+        # Helper Variables
+        primary_location = work.get("primary_location") or {}
+        url = primary_location.get("landing_page_url") or work.get("id")
 
         ev_hit = EvidenceHit(
-            evidence_id= f'OpenAlex:{work.get("id", "").lstrip("https://openalex.org/")}',
+            evidence_id= f'OpenAlex:{work.get("id", "").removeprefix("https://openalex.org/")}',
             record_ref=record_ref,
             hit_scope= hit_scope, # "oql": "works where full text has (natural language processing)",
             subject_entity_id= entity.id,
@@ -372,15 +375,15 @@ class OpenAlexNormalizer:
             title= work.get('display_name'),
             language= work.get('language'),
             content_type= work.get('type'),
-            url= work.get('primary_location').get('landing_page_url', work.get('id')),
+            url= url,
             published_at= work.get('publication_date'),
             collected_at=datetime.now(),
             geography= work.get('countries'),
             authors=authors,
-            publishers= work['authorships']['institutions'].get('display_name'),
-            source_fields={'oa_id': work.get('id'), 'funders': work.get('funders'),
-                           'institutions': work['authorships']['institutions'].get('display_name')},
-            match_reasons=matches
+            source_fields={'oa_id': work.get('id'), 'funders': work.get('funders')},
+            match_reasons=matches,
+            matched_aliases= matched_alias,
+            matched_concept_ids=matched_id,
         )
 
         return ev_hit
@@ -406,6 +409,30 @@ class OpenAlexNormalizer:
 
         return ev_hit_list
 
+    def enrich_match_id_alias(self, match_reasons: list[MatchReason]) -> tuple[list[str], list[str]]:
+        """
+        potentially useful idea if i need to have the following variables exposed.
+
+        matched_aliases: list[str] = field(default_factory=list)
+        matched_concept_ids: list[str] = field(default_factory=list)
+        matched_terms_by_concept: dict[str, list[str]] = field(default_factory=dict)
+        matched_negative_terms: list[str] = field(default_factory=list)
+        match_reasons: list[MatchReason] = field(default_factory=list)
+
+        otherwise.. nvm
+        :param match_reasons:
+        :return:
+        """
+        matched_concept_ids = []
+        matched_aliases = []
+
+        for reason in match_reasons:
+            if reason.matcher == 'concept_keyword':
+                matched_concept_ids.append(reason.matched_id)
+            elif reason.matcher == 'entity_alias':
+                matched_aliases.append(reason.matched_id)
+
+        return matched_concept_ids, matched_aliases
 
 
 

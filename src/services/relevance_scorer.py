@@ -4,7 +4,6 @@ from src.models.watchlist import WatchlistEntity
 from src.models.scored_evidence_hit import ScoredEvidenceHit, ScoreComponent
 from src.config_loader import Config, ScoringConfig
 from datetime import datetime, timezone, date
-import requests
 
 class RelevanceScorer:
     """
@@ -48,12 +47,14 @@ class RelevanceScorer:
         total_score += confidence[0]
         score_components.extend(confidence[1])
 
+
         return ScoredEvidenceHit(
             evidence_hit=hit,
             total_score=total_score,
             relevance_score=relevance[0],
             severity_score=severity[0],
             confidence_score=confidence[0],
+            recency_score= recency[0],
             novelty_score=0.0,
             relevance_label=self._label(total_score),
             score_components=score_components,
@@ -61,13 +62,13 @@ class RelevanceScorer:
 
         )
 
-
     def routing_decision(self, score) -> RoutingDecision:
-        if score <= 2:
+        routing = self.rules.routing
+        if score < routing.get('ignore_below'):
             return 'ignore'
-        elif score <= 5:
+        elif score < routing.get('store_only_below'):
             return 'store_only'
-        elif score <= 7:
+        elif score < routing.get('manual_review_below'):
             return 'manual_review'
         else:
             return 'alert'
@@ -93,16 +94,16 @@ class RelevanceScorer:
 
         # HitScope
         if hit.hit_scope:
-            rel_score_val += self.rules.relevance['hit_scope'].get(hit.hit_scope)
+            rel_score_val += self.rules.relevance['hit_scope'].get(hit.hit_scope, 0.0)
             score_comp.append(ScoreComponent(
                 name=hit.hit_scope,
-                value=self.rules.relevance['hit_scope'].get(hit.hit_scope),
+                value=self.rules.relevance['hit_scope'].get(hit.hit_scope, 0.0),
                 reason= hit.hit_scope
             ))
 
         # MatchReason match types scored
         for match in hit.match_reasons:
-            value = self.rules.relevance['entity_match'].get(match.matcher)
+            value = self.rules.relevance['entity_match'].get(match.matcher, 0.0)
             rel_score_val += value
             score_comp.append(ScoreComponent(
                 name=match.matched_id,
@@ -112,7 +113,7 @@ class RelevanceScorer:
 
         # entity importance scoring
         entity_prio = self.config.entities.get(entity.id).priority
-        value = self.rules.relevance['entity_priority'].get(entity_prio)
+        value = self.rules.relevance['entity_priority'].get(entity_prio, 0.0)
         rel_score_val += value
         score_comp.append(ScoreComponent(
             name='entity_priority',
@@ -121,15 +122,19 @@ class RelevanceScorer:
         ))
 
         # context_keys: Commodity Matching
-        all_commodities = [[commodity.id].extend(commodity.manual_aliases)
-                           for commodity in self.config.entities.values()
-                           if commodity.entity_type == 'commodity']
+        all_commodities = set()
+
+        for commodity in self.config.entities.values():
+            if commodity.entity_type == "commodity":
+                all_commodities.add(commodity.id.lower())
+                all_commodities.update(alias.lower() for alias in commodity.manual_aliases)
+
         if not hit.commodities:
             count = 0.0
             for key in hit.context_keys:
                 if key in all_commodities:
                     count += 1
-            value = self.rules.relevance['context_keys'].get('commodity_match') * count
+            value = self.rules.relevance['context_keys'].get('commodity_match', 0.0) * count
             rel_score_val += value
             score_comp.append(ScoreComponent(
                 name= 'commodity match',
@@ -156,15 +161,20 @@ class RelevanceScorer:
         # context_keys Geography (country):
         # INCOMPLETE, too broad/specific
         # possible enrichment route -> WikiData
-        all_countries = [[country.id].extend(country.manual_aliases)
-                           for country in self.config.entities.values()
-                           if country.entity_type == 'country']
+
+        all_countries = set()
+
+        for country in self.config.entities.values():
+            if country.entity_type == "country":
+                all_countries.add(country.id.lower())
+                all_countries.update(alias.lower() for alias in country.manual_aliases)
+
         if hit.geography:
             count = 0.0
             for country in hit.geography:
                 if country in all_countries:
                     count += 1
-            value = self.rules.relevance.get('context_keys').get('geography_match') * count
+            value = self.rules.relevance.get('context_keys').get('geography_match', 0.0) * count
             rel_score_val += value
             score_comp.append(ScoreComponent(
                 name='geography match',
@@ -177,7 +187,7 @@ class RelevanceScorer:
             for key in hit.context_keys:
                 if key in all_countries:
                     count += 1
-            value = self.rules.relevance['context_keys'].get('geography_match') * count
+            value = self.rules.relevance['context_keys'].get('geography_match', 0.0) * count
             rel_score_val += value
             score_comp.append(ScoreComponent(
                 name='geography match',
@@ -274,7 +284,7 @@ class RelevanceScorer:
 
         for match in hit.match_reasons:
             if match.matcher == 'concept_keyword':
-                sev_bonus = self.rules.severity.get('concept_weights').get(match.matched_id, 'default_weight')
+                sev_bonus = self.rules.severity.get('concept_weights').get(match.matched_id, 1.0)
                 sev_score += sev_bonus
                 score_comp.append(ScoreComponent(
                     name='concept match',
@@ -287,9 +297,9 @@ class RelevanceScorer:
                 and hit.record_ref.source == 'gdelt'):
             for match in hit.match_reasons:
                 if match.matcher == 'cameo_code':
-                    cameo_score = self.rules.severity.get('gdelt').get('cameo_exact_weights').get(match.value, 0)
+                    cameo_score = self.rules.severity.get('gdelt').get('cameo_exact_weights').get(match.value, 0.0)
                     if cameo_score == 0:
-                        cameo_score = self.rules.severity.get('gdelt').get('cameo_root_weights').get(match.value)
+                        cameo_score = self.rules.severity.get('gdelt').get('cameo_root_weights').get(match.value, 0.0)
                     sev_score += cameo_score
                     score_comp.append(ScoreComponent(
                         name='cameo match',
@@ -297,7 +307,7 @@ class RelevanceScorer:
                         reason=f'CAMEO code match | Code: {match.value} | Bonus: {cameo_score}'
                     ))
                 if match.value in self.rules.severity.get('gdelt').get('severe_cameo_codes'):
-                    sev_cam_bonus = self.rules.severity.get('gdelt').get('severe_cameo_bonus')
+                    sev_cam_bonus = self.rules.severity.get('gdelt').get('severe_cameo_bonus', 0.0)
                     sev_score += sev_cam_bonus
                     score_comp.append(ScoreComponent(
                         name='severe cameo match',
@@ -322,7 +332,7 @@ class RelevanceScorer:
         if hit.record_ref.source == 'gdelt':
             # Uses GDELT NumSources
             num_src = hit.source_fields.get('numsources')
-            if num_src >= self.rules.confidence.get('gdelt').get('num_sources').get('high_threshold'):
+            if self._safe_int(num_src) >= self.rules.confidence.get('gdelt').get('num_sources').get('high_threshold'):
                 value = self.rules.confidence.get('gdelt').get('num_sources').get('high_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -330,7 +340,7 @@ class RelevanceScorer:
                     value=value,
                     reason=f'GDELT NumSources Bonus value {value}'
                 ))
-            elif num_src >= self.rules.confidence.get('gdelt').get('num_sources').get('medium_threshold'):
+            elif self._safe_int(num_src) >= self.rules.confidence.get('gdelt').get('num_sources').get('medium_threshold'):
                 value = self.rules.confidence.get('gdelt').get('num_sources').get('medium_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -341,7 +351,7 @@ class RelevanceScorer:
 
             # Uses GDELT NumMentions.
             num_men = hit.source_fields.get('nummentions')
-            if num_men >= self.rules.confidence.get('gdelt').get('num_mentions').get('high_threshold'):
+            if self._safe_int(num_men) >= self.rules.confidence.get('gdelt').get('num_mentions').get('high_threshold'):
                 value = self.rules.confidence.get('gdelt').get('num_mentions').get('high_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -349,7 +359,7 @@ class RelevanceScorer:
                     value=value,
                     reason=f'GDELT NumMentions Bonus value {value}'
                 ))
-            elif num_men >= self.rules.confidence.get('gdelt').get('num_mentions').get('medium_threshold'):
+            elif self._safe_int(num_men) >= self.rules.confidence.get('gdelt').get('num_mentions').get('medium_threshold'):
                 value = self.rules.confidence.get('gdelt').get('num_mentions').get('medium_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -360,7 +370,7 @@ class RelevanceScorer:
 
             # Uses GDELT NumArticles.
             num_men = hit.source_fields.get('numarticles')
-            if num_men >= self.rules.confidence.get('gdelt').get('num_articles').get('high_threshold'):
+            if self._safe_int(num_men) >= self.rules.confidence.get('gdelt').get('num_articles').get('high_threshold'):
                 value = self.rules.confidence.get('gdelt').get('num_articles').get('high_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -368,7 +378,7 @@ class RelevanceScorer:
                     value=value,
                     reason=f'GDELT NumArticles Bonus value {value}'
                 ))
-            elif num_men >= self.rules.confidence.get('gdelt').get('num_articles').get('medium_threshold'):
+            elif self._safe_int(num_men) >= self.rules.confidence.get('gdelt').get('num_articles').get('medium_threshold'):
                 value = self.rules.confidence.get('gdelt').get('num_articles').get('medium_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -379,7 +389,7 @@ class RelevanceScorer:
 
             # Uses GDELT Mentions Confidence
             men_conf = hit.source_fields.get('confidence')
-            if men_conf >= self.rules.confidence.get('gdelt').get('mention_confidence').get('high_threshold'):
+            if self._safe_int(men_conf) >= self.rules.confidence.get('gdelt').get('mention_confidence').get('high_threshold'):
                 value = self.rules.confidence.get('gdelt').get('mention_confidence').get('high_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -388,7 +398,7 @@ class RelevanceScorer:
                     reason=f'GDELT Confidence Bonus value {value}'
                 ))
 
-            elif men_conf >= self.rules.confidence.get('gdelt').get('mention_confidence').get('medium_threshold'):
+            elif self._safe_int(men_conf) >= self.rules.confidence.get('gdelt').get('mention_confidence').get('medium_threshold'):
                 value = self.rules.confidence.get('gdelt').get('mention_confidence').get('medium_weight')
                 conf_score += value
                 score_comp.append(ScoreComponent(
@@ -405,15 +415,6 @@ class RelevanceScorer:
                     value=value,
                     reason=f'GDELT URL present bonus: {value}'
                 ))
-                response = requests.get(hit.url)
-                if response.status_code == 404:
-                    value = self.rules.penalties.get('url_404')
-                    conf_score += value
-                    score_comp.append(ScoreComponent(
-                        name='GDELT URL Verification penalty',
-                        value= value,
-                        reason='URL request status code: 404'
-                    ))
 
             value = (self.rules.confidence.get('gdelt')
                            .get('source_quality')
@@ -427,3 +428,9 @@ class RelevanceScorer:
             ))
 
         return conf_score, score_comp
+
+    def _safe_int(self, value, default=0):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
